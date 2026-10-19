@@ -1,0 +1,1486 @@
+{
+  "version": "2026-2027",
+  "name": "山东大学网络空间安全学院本科生素质能力评价",
+  "description": "2026-2027 学年；目前沿用 2025-12-18 学院实施细则与 2025 创新素养补充通知。学校发布新文件后复制本版本再调整。",
+  "total_cap": 100,
+  "sources": [
+    {
+      "title": "山东大学网络空间安全学院本科生综合评价实施细则（试行）（12.18）",
+      "file": "1.网络空间安全学院本科生综合评价实施细则（试行）（12.18）.pdf",
+      "note": "主规则；附件 2 为素质能力评价实施细则"
+    },
+    {
+      "title": "关于《山东大学本科生综合评价办法（试行）》创新素养部分的补充通知（2025）",
+      "file": "附件1：关于《山东大学本科生综合评价办法（试行）》创新素养部分的补充通知（2025）.docx",
+      "note": "创新素养部分补充；与学院细则一致"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "quality",
+      "parent": null,
+      "name": "素质能力",
+      "level": "root",
+      "cap": 100,
+      "aggregation": "sum",
+      "sort": 0
+    },
+    {
+      "id": "physical",
+      "parent": "quality",
+      "name": "身心素养",
+      "level": "category",
+      "cap": 15,
+      "aggregation": "sum",
+      "sort": 10,
+      "source_ref": "细则 P16 一、身心素养（上限 15 分）"
+    },
+    {
+      "id": "physical_base",
+      "parent": "physical",
+      "name": "基础性评价",
+      "level": "section",
+      "cap": 9,
+      "aggregation": "sum",
+      "sort": 11,
+      "source_ref": "细则 P16 一（一）基础性评价（上限 9 分）"
+    },
+    {
+      "id": "physical_base_sports",
+      "parent": "physical_base",
+      "name": "体育/心理类活动参与",
+      "level": "group",
+      "cap": 9,
+      "aggregation": "top_n",
+      "max_count": 3,
+      "sort": 111,
+      "source_ref": "细则 P16 一（一）（1）每次计 3 分"
+    },
+    {
+      "id": "physical_base_sports_rule",
+      "parent": "physical_base_sports",
+      "name": "单次体育/心理类活动",
+      "level": "rule",
+      "calculator": "per_occurrence",
+      "params": {
+        "points": 3,
+        "proof_required": true
+      },
+      "sort": 1111
+    },
+    {
+      "id": "physical_base_fitness",
+      "parent": "physical_base",
+      "name": "《国家学生体质健康标准》测试",
+      "level": "rule",
+      "calculator": "lookup",
+      "params": {
+        "field": "grade",
+        "table": {
+          "优秀": 9,
+          "良好": 6,
+          "合格": 3,
+          "不合格": 0
+        },
+        "default": 0
+      },
+      "sort": 112,
+      "source_ref": "细则 P16 一（一）（2）"
+    },
+    {
+      "id": "physical_achievement",
+      "parent": "physical",
+      "name": "成果性评价",
+      "level": "section",
+      "cap": 6,
+      "aggregation": "highest",
+      "sort": 12,
+      "source_ref": "细则 P16-17 一（二）成果性评价（上限 6 分，不累计）"
+    },
+    {
+      "id": "physical_achievement_sports",
+      "parent": "physical_achievement",
+      "name": "体育及心理类赛事获奖",
+      "level": "rule",
+      "calculator": "tiered_award",
+      "params": {
+        "table": {
+          "national": {
+            "individual": {
+              "first": 6,
+              "second": 5.25,
+              "third": 4.5,
+              "other": 3.75
+            },
+            "collective": {
+              "first": 6,
+              "second": 5.25,
+              "third": 4.5,
+              "other": 3.75
+            }
+          },
+          "provincial": {
+            "individual": {
+              "first": 4.5,
+              "second": 3.75,
+              "third": 3,
+              "other": 2.25
+            },
+            "collective": {
+              "first": 5.25,
+              "second": 4.5,
+              "third": 3.75,
+              "other": 3
+            }
+          },
+          "city": {
+            "individual": {
+              "first": 3.375,
+              "second": 2.625,
+              "third": 1.875,
+              "other": 1.3125
+            },
+            "collective": {
+              "first": 4.125,
+              "second": 3.375,
+              "third": 2.625,
+              "other": 1.875
+            }
+          },
+          "school": {
+            "individual": {
+              "first": 2.25,
+              "second": 1.5,
+              "third": 0.75,
+              "other": 0.375
+            },
+            "collective": {
+              "first": 3,
+              "second": 2.25,
+              "third": 1.5,
+              "other": 0.75
+            }
+          },
+          "academy": {
+            "individual": {
+              "first": 2.125,
+              "second": 1.375,
+              "third": 0.625,
+              "other": 0.25
+            },
+            "collective": {
+              "first": 2.875,
+              "second": 2.125,
+              "third": 1.375,
+              "other": 0.625
+            }
+          },
+          "college": {
+            "individual": {
+              "first": 2.0,
+              "second": 1.25,
+              "third": 0.5,
+              "other": 0.125
+            },
+            "collective": {
+              "first": 2.75,
+              "second": 2.0,
+              "third": 1.25,
+              "other": 0.5
+            }
+          }
+        },
+        "rank_mapping": {
+          "first": "first",
+          "second": "second",
+          "third": "third",
+          "other": "other"
+        },
+        "prize_mapping": {
+          "first": "first",
+          "second": "third",
+          "third": "other"
+        },
+        "rank_number_mapping": [
+          {
+            "max": 1,
+            "level": "first"
+          },
+          {
+            "max": 2,
+            "level": "second"
+          },
+          {
+            "max": 3,
+            "level": "third"
+          },
+          {
+            "max": 8,
+            "level": "other"
+          }
+        ],
+        "rank_limit": 8,
+        "modifiers": {
+          "fun": 0.5
+        },
+        "default": 0
+      },
+      "sort": 121,
+      "source_ref": "细则 P17 一（二）表格及注；市级/书院级/院级按注折算；趣味类减半"
+    },
+    {
+      "id": "arts",
+      "parent": "quality",
+      "name": "文艺素养",
+      "level": "category",
+      "cap": 15,
+      "aggregation": "sum",
+      "sort": 20,
+      "source_ref": "细则 P17 二、文艺素养（上限 15 分）"
+    },
+    {
+      "id": "arts_base",
+      "parent": "arts",
+      "name": "基础性评价",
+      "level": "section",
+      "cap": 9,
+      "aggregation": "sum",
+      "sort": 21,
+      "source_ref": "细则 P17 二（一）基础性评价（上限 9 分）"
+    },
+    {
+      "id": "arts_base_activities",
+      "parent": "arts_base",
+      "name": "美育类活动参与",
+      "level": "group",
+      "cap": 9,
+      "aggregation": "top_n",
+      "max_count": 3,
+      "sort": 211,
+      "source_ref": "细则 P17 二（一）每次计 3 分"
+    },
+    {
+      "id": "arts_base_activities_rule",
+      "parent": "arts_base_activities",
+      "name": "单次美育类活动",
+      "level": "rule",
+      "calculator": "per_occurrence",
+      "params": {
+        "points": 3,
+        "proof_required": true
+      },
+      "sort": 2111
+    },
+    {
+      "id": "arts_achievement",
+      "parent": "arts",
+      "name": "成果性评价",
+      "level": "section",
+      "cap": 6,
+      "aggregation": "highest",
+      "sort": 22,
+      "source_ref": "细则 P17 二（二）成果性评价（上限 6 分，不累计）"
+    },
+    {
+      "id": "arts_achievement_awards",
+      "parent": "arts_achievement",
+      "name": "艺术展演/比赛获奖",
+      "level": "rule",
+      "calculator": "tiered_award",
+      "params": {
+        "table": {
+          "national": {
+            "individual": {
+              "first": 6,
+              "second": 5.25,
+              "third": 3.75,
+              "other": 3
+            },
+            "collective": {
+              "first": 3.75,
+              "second": 3,
+              "third": 2.25,
+              "other": 1.5
+            }
+          },
+          "provincial": {
+            "individual": {
+              "first": 4.5,
+              "second": 3.75,
+              "third": 2.25,
+              "other": 1.5
+            },
+            "collective": {
+              "first": 3,
+              "second": 2.25,
+              "third": 1.5,
+              "other": 0.75
+            }
+          },
+          "city": {
+            "individual": {
+              "first": 3.75,
+              "second": 3.0,
+              "third": 1.875,
+              "other": 1.125
+            },
+            "collective": {
+              "first": 2.625,
+              "second": 1.875,
+              "third": 1.125,
+              "other": 0.5625
+            }
+          },
+          "school": {
+            "individual": {
+              "first": 3,
+              "second": 2.25,
+              "third": 1.5,
+              "other": 0.75
+            },
+            "collective": {
+              "first": 2.25,
+              "second": 1.5,
+              "third": 0.75,
+              "other": 0.375
+            }
+          },
+          "academy": {
+            "individual": {
+              "first": 2.875,
+              "second": 2.125,
+              "third": 1.375,
+              "other": 0.625
+            },
+            "collective": {
+              "first": 2.125,
+              "second": 1.375,
+              "third": 0.625,
+              "other": 0.25
+            }
+          },
+          "college": {
+            "individual": {
+              "first": 2.75,
+              "second": 2.0,
+              "third": 1.25,
+              "other": 0.5
+            },
+            "collective": {
+              "first": 2.0,
+              "second": 1.25,
+              "third": 0.5,
+              "other": 0.125
+            }
+          }
+        },
+        "rank_mapping": {
+          "first": "first",
+          "second": "second",
+          "third": "third",
+          "other": "other"
+        },
+        "prize_mapping": {
+          "first": "first",
+          "second": "second",
+          "third": "third",
+          "special": "first"
+        },
+        "rank_number_mapping": [
+          {
+            "max": 1,
+            "level": "first"
+          },
+          {
+            "max": 3,
+            "level": "second"
+          },
+          {
+            "max": 6,
+            "level": "third"
+          },
+          {
+            "max": 8,
+            "level": "other"
+          }
+        ],
+        "rank_limit": 8,
+        "modifiers": {},
+        "default": 0
+      },
+      "sort": 221,
+      "source_ref": "细则 P18 二（二）表格及注；名次与等级映射见注（3）"
+    },
+    {
+      "id": "arts_achievement_literature",
+      "parent": "arts_achievement",
+      "name": "文学作品/新闻稿件",
+      "level": "rule",
+      "calculator": "literature",
+      "params": {
+        "platform_points": {
+          "national": 5,
+          "campus": 3,
+          "school": 2
+        },
+        "staff_min_count": 5
+      },
+      "sort": 222,
+      "source_ref": "细则 P18 文学作品注；供职平台/院学通社记者第 6 篇起计分"
+    },
+    {
+      "id": "labor",
+      "parent": "quality",
+      "name": "劳动素养",
+      "level": "category",
+      "cap": 25,
+      "aggregation": "sum",
+      "sort": 30,
+      "source_ref": "细则 P18 三、劳动素养（上限 25 分）"
+    },
+    {
+      "id": "labor_base",
+      "parent": "labor",
+      "name": "基础性评价",
+      "level": "section",
+      "cap": 15,
+      "aggregation": "sum",
+      "sort": 31,
+      "source_ref": "细则 P18-19 三（一）基础性评价（上限 15 分）"
+    },
+    {
+      "id": "labor_base_social_work",
+      "parent": "labor_base",
+      "name": "社会工作任职",
+      "level": "rule",
+      "calculator": "boolean",
+      "params": {
+        "points": 5
+      },
+      "sort": 311,
+      "source_ref": "细则 P18 任职一学年及以上，基础分 5 分"
+    },
+    {
+      "id": "labor_base_practice",
+      "parent": "labor_base",
+      "name": "社会实践考核合格",
+      "level": "rule",
+      "calculator": "boolean",
+      "params": {
+        "points": 5
+      },
+      "sort": 312,
+      "source_ref": "细则 P19 寒暑假社会实践考核合格，基础分 5 分"
+    },
+    {
+      "id": "labor_base_volunteer",
+      "parent": "labor_base",
+      "name": "志愿服务时长",
+      "level": "rule",
+      "calculator": "threshold",
+      "params": {
+        "field": "hours",
+        "op": "gt",
+        "threshold": 20,
+        "points": 5
+      },
+      "sort": 313,
+      "source_ref": "细则 P19 学年志愿服务时长超过 20 小时，基础分 5 分"
+    },
+    {
+      "id": "labor_base_career",
+      "parent": "labor_base",
+      "name": "生涯发展活动",
+      "level": "group",
+      "cap": 5,
+      "aggregation": "top_n",
+      "max_count": 5,
+      "sort": 314,
+      "source_ref": "细则 P19 每次 1 分，最高 5 分"
+    },
+    {
+      "id": "labor_base_career_rule",
+      "parent": "labor_base_career",
+      "name": "单次生涯发展活动",
+      "level": "rule",
+      "calculator": "per_occurrence",
+      "params": {
+        "points": 1
+      },
+      "sort": 3141
+    },
+    {
+      "id": "labor_base_dorm",
+      "parent": "labor_base",
+      "name": "宿舍卫生无不合格",
+      "level": "rule",
+      "calculator": "boolean",
+      "params": {
+        "points": 5
+      },
+      "sort": 315,
+      "source_ref": "细则 P19 学年宿舍卫生评比未有不合格，基础分 5 分"
+    },
+    {
+      "id": "labor_base_education",
+      "parent": "labor_base",
+      "name": "劳动教育时长",
+      "level": "rule",
+      "calculator": "threshold",
+      "params": {
+        "field": "hours",
+        "op": "gt",
+        "threshold": 8,
+        "points": 5
+      },
+      "sort": 316,
+      "source_ref": "细则 P19 学年劳动教育时长超过 8 小时，基础分 5 分"
+    },
+    {
+      "id": "labor_base_military",
+      "parent": "labor_base",
+      "name": "参军入伍",
+      "level": "rule",
+      "calculator": "boolean",
+      "params": {
+        "points": 15
+      },
+      "sort": 317,
+      "source_ref": "细则 P19 参军入伍考评学年基础分为 15 分"
+    },
+    {
+      "id": "labor_achievement",
+      "parent": "labor",
+      "name": "成果性评价",
+      "level": "section",
+      "cap": 10,
+      "aggregation": "sum",
+      "sort": 32,
+      "source_ref": "细则 P19 三（二）成果性评价（上限 10 分）"
+    },
+    {
+      "id": "labor_ach_social_work",
+      "parent": "labor_achievement",
+      "name": "社会工作成果",
+      "level": "group",
+      "cap": 10,
+      "aggregation": "sum",
+      "sort": 321,
+      "source_ref": "细则 P19-20 社会工作；考核合格基础 4 分，工作成效按表累加，同类荣誉取最高"
+    },
+    {
+      "id": "labor_ach_social_work_base",
+      "parent": "labor_ach_social_work",
+      "name": "任职考核合格",
+      "level": "rule",
+      "calculator": "boolean",
+      "params": {
+        "points": 4
+      },
+      "sort": 3210,
+      "source_ref": "细则 P19 学院、指导单位考核合格后可获得 4 分"
+    },
+    {
+      "id": "labor_ach_social_work_honor",
+      "parent": "labor_ach_social_work",
+      "name": "工作成效荣誉",
+      "level": "group",
+      "cap": 10,
+      "aggregation": "highest",
+      "sort": 3211
+    },
+    {
+      "id": "labor_ach_social_work_collective",
+      "parent": "labor_ach_social_work_honor",
+      "name": "集体荣誉",
+      "level": "rule",
+      "calculator": "matrix",
+      "params": {
+        "dimensions": [
+          "region",
+          "steps"
+        ],
+        "table": {
+          "national": {
+            "0": 10,
+            "1": 8.5,
+            "2": 7,
+            "3": 5.5,
+            "4": 4,
+            "5": 2.5
+          },
+          "provincial": {
+            "0": 8.5,
+            "1": 7,
+            "2": 5.5,
+            "3": 4,
+            "4": 2.5,
+            "5": 1
+          },
+          "city": {
+            "0": 7,
+            "1": 5.5,
+            "2": 4,
+            "3": 2.5,
+            "4": 1,
+            "5": 0
+          },
+          "school": {
+            "0": 5.5,
+            "1": 4,
+            "2": 2.5,
+            "3": 1,
+            "4": 0,
+            "5": 0
+          },
+          "college": {
+            "0": 4,
+            "1": 2.5,
+            "2": 1,
+            "3": 0,
+            "4": 0,
+            "5": 0
+          }
+        },
+        "default": 0
+      },
+      "sort": 32111,
+      "source_ref": "细则 P19-20 表格；steps=0 为主要负责人，其他干部每降一级减 1.5 分"
+    },
+    {
+      "id": "labor_ach_social_work_personal",
+      "parent": "labor_ach_social_work_honor",
+      "name": "任职期间个人荣誉",
+      "level": "rule",
+      "calculator": "lookup",
+      "params": {
+        "field": "region",
+        "table": {
+          "national": 10,
+          "provincial": 8.5,
+          "city": 7,
+          "school": 5.5,
+          "college": 4
+        },
+        "default": 0
+      },
+      "sort": 32112,
+      "source_ref": "细则 P19-20 表格“任职期间获得个人荣誉”"
+    },
+    {
+      "id": "labor_ach_practice",
+      "parent": "labor_achievement",
+      "name": "社会实践成果",
+      "level": "group",
+      "cap": 10,
+      "aggregation": "highest",
+      "sort": 322,
+      "source_ref": "细则 P20 社会实践；队内位次以报名顺序为准"
+    },
+    {
+      "id": "labor_ach_practice_rule",
+      "parent": "labor_ach_practice",
+      "name": "社会实践获奖",
+      "level": "rule",
+      "calculator": "matrix",
+      "params": {
+        "dimensions": [
+          "region",
+          "role"
+        ],
+        "table": {
+          "national": {
+            "leader": 10,
+            "second": 8.5,
+            "third": 7,
+            "fourth_plus": 5.5,
+            "individual": 10
+          },
+          "provincial": {
+            "leader": 8.5,
+            "second": 7,
+            "third": 5.5,
+            "fourth_plus": 4,
+            "individual": 8.5
+          },
+          "city": {
+            "leader": 7,
+            "second": 5.5,
+            "third": 4,
+            "fourth_plus": 2.5,
+            "individual": 7
+          },
+          "school": {
+            "leader": 5.5,
+            "second": 4,
+            "third": 2.5,
+            "fourth_plus": 1,
+            "individual": 5.5
+          },
+          "college": {
+            "leader": 4,
+            "second": 2.5,
+            "third": 1,
+            "fourth_plus": 0,
+            "individual": 4
+          }
+        },
+        "default": 0
+      },
+      "sort": 3221
+    },
+    {
+      "id": "labor_ach_volunteer",
+      "parent": "labor_achievement",
+      "name": "志愿服务成果",
+      "level": "group",
+      "cap": 10,
+      "aggregation": "highest",
+      "sort": 323,
+      "source_ref": "细则 P20 志愿服务；每学年不低于 20 小时"
+    },
+    {
+      "id": "labor_ach_volunteer_team",
+      "parent": "labor_ach_volunteer",
+      "name": "志愿服务评优",
+      "level": "rule",
+      "calculator": "gated_matrix",
+      "params": {
+        "gate_field": "hours",
+        "gate_op": "gte",
+        "gate_value": 20,
+        "dimensions": [
+          "region",
+          "role"
+        ],
+        "table": {
+          "national": {
+            "leader": 10,
+            "second": 8.5,
+            "third": 7,
+            "fourth_plus": 5.5,
+            "individual": 10
+          },
+          "provincial": {
+            "leader": 8.5,
+            "second": 7,
+            "third": 5.5,
+            "fourth_plus": 4,
+            "individual": 8.5
+          },
+          "city": {
+            "leader": 7,
+            "second": 5.5,
+            "third": 4,
+            "fourth_plus": 2.5,
+            "individual": 7
+          },
+          "school": {
+            "leader": 5.5,
+            "second": 4,
+            "third": 2.5,
+            "fourth_plus": 1,
+            "individual": 5.5
+          },
+          "college": {
+            "leader": 4,
+            "second": 2.5,
+            "third": 1,
+            "fourth_plus": 0,
+            "individual": 4
+          }
+        },
+        "default": 0
+      },
+      "sort": 3231
+    },
+    {
+      "id": "labor_ach_volunteer_competition",
+      "parent": "labor_ach_volunteer",
+      "name": "志愿服务比赛",
+      "level": "rule",
+      "calculator": "matrix",
+      "params": {
+        "dimensions": [
+          "region",
+          "award"
+        ],
+        "table": {
+          "national": {
+            "first": 10,
+            "second": 8.5,
+            "third": 7
+          },
+          "provincial": {
+            "first": 8.5,
+            "second": 7,
+            "third": 5.5
+          },
+          "city": {
+            "first": 7,
+            "second": 5.5,
+            "third": 4
+          },
+          "school": {
+            "first": 5.5,
+            "second": 4,
+            "third": 2.5
+          },
+          "college": {
+            "first": 4,
+            "second": 2.5,
+            "third": 1
+          }
+        },
+        "default": 0
+      },
+      "sort": 3232
+    },
+    {
+      "id": "labor_ach_dorm",
+      "parent": "labor_achievement",
+      "name": "宿舍劳动成果",
+      "level": "group",
+      "cap": 10,
+      "aggregation": "sum",
+      "sort": 324,
+      "source_ref": "细则 P21 宿舍劳动表格"
+    },
+    {
+      "id": "labor_ach_dorm_star",
+      "parent": "labor_ach_dorm",
+      "name": "校级星级宿舍",
+      "level": "group",
+      "cap": 4,
+      "aggregation": "highest",
+      "sort": 3241,
+      "source_ref": "细则 P21 校级星级宿舍 4 分"
+    },
+    {
+      "id": "labor_ach_dorm_star_rule",
+      "parent": "labor_ach_dorm_star",
+      "name": "星级宿舍",
+      "level": "rule",
+      "calculator": "matrix",
+      "params": {
+        "dimensions": [
+          "star",
+          "role"
+        ],
+        "table": {
+          "five": {
+            "head": 4,
+            "member": 3.5
+          },
+          "four": {
+            "head": 3.5,
+            "member": 3
+          },
+          "three": {
+            "head": 3,
+            "member": 2.5
+          },
+          "participation": {
+            "head": 2,
+            "member": 2
+          }
+        },
+        "default": 0
+      },
+      "sort": 32411
+    },
+    {
+      "id": "labor_ach_dorm_school_festival",
+      "parent": "labor_ach_dorm",
+      "name": "校级宿舍文化节",
+      "level": "group",
+      "cap": 4,
+      "aggregation": "sum",
+      "sort": 3242,
+      "source_ref": "细则 P21 校级宿舍文化节 4 分；多项集体奖项合计不超过 4 分"
+    },
+    {
+      "id": "labor_ach_dorm_school_festival_rule",
+      "parent": "labor_ach_dorm_school_festival",
+      "name": "校级宿舍文化节奖项",
+      "level": "rule",
+      "calculator": "matrix",
+      "params": {
+        "dimensions": [
+          "award_type",
+          "award",
+          "role"
+        ],
+        "table": {
+          "collective": {
+            "first": {
+              "main": 4,
+              "member": 3.5
+            },
+            "second": {
+              "main": 3.5,
+              "member": 3
+            },
+            "third": {
+              "main": 3,
+              "member": 2.5
+            },
+            "participation": {
+              "main": 2,
+              "member": 2
+            }
+          },
+          "individual": {
+            "first": {
+              "individual": 4
+            },
+            "second": {
+              "individual": 3.5
+            },
+            "third": {
+              "individual": 3
+            },
+            "participation": {
+              "individual": 2
+            }
+          }
+        },
+        "default": 0
+      },
+      "sort": 32421
+    },
+    {
+      "id": "labor_ach_dorm_college_festival",
+      "parent": "labor_ach_dorm",
+      "name": "院级宿舍文化节",
+      "level": "group",
+      "cap": 10,
+      "aggregation": "highest",
+      "sort": 3243,
+      "source_ref": "细则 P21 院级宿舍文化节；个人按最高"
+    },
+    {
+      "id": "labor_ach_dorm_college_festival_rule",
+      "parent": "labor_ach_dorm_college_festival",
+      "name": "院级宿舍文化节奖项",
+      "level": "rule",
+      "calculator": "matrix",
+      "params": {
+        "dimensions": [
+          "award",
+          "role"
+        ],
+        "table": {
+          "first": {
+            "main": 2,
+            "member": 1.75
+          },
+          "second": {
+            "main": 1.75,
+            "member": 1.5
+          },
+          "third": {
+            "main": 1.5,
+            "member": 1.25
+          },
+          "participation": {
+            "main": 1,
+            "member": 1
+          }
+        },
+        "default": 0
+      },
+      "sort": 32431
+    },
+    {
+      "id": "labor_ach_career",
+      "parent": "labor_achievement",
+      "name": "生涯发展获奖",
+      "level": "group",
+      "cap": 10,
+      "aggregation": "highest",
+      "sort": 325,
+      "source_ref": "细则 P21 生涯发展表格；团队逐位递减 1.5 分"
+    },
+    {
+      "id": "labor_ach_career_team",
+      "parent": "labor_ach_career",
+      "name": "生涯发展比赛（国家级至校级）",
+      "level": "rule",
+      "calculator": "team_award",
+      "params": {
+        "base_table": {
+          "national": {
+            "first": 10,
+            "second": 8.5,
+            "third": 7
+          },
+          "provincial": {
+            "first": 8.5,
+            "second": 7,
+            "third": 5.5
+          },
+          "city": {
+            "first": 7,
+            "second": 5.5,
+            "third": 4
+          },
+          "school": {
+            "first": 5.5,
+            "second": 4,
+            "third": 2.5
+          }
+        },
+        "decrement": 1.5,
+        "max_position": 5,
+        "default": 0
+      },
+      "sort": 3251
+    },
+    {
+      "id": "labor_ach_career_college",
+      "parent": "labor_ach_career",
+      "name": "生涯发展比赛（院级）",
+      "level": "rule",
+      "calculator": "manual",
+      "params": {
+        "max_points": 4
+      },
+      "sort": 3252,
+      "source_ref": "细则 P21 院级不超过 4 分，具体由学院制定"
+    },
+    {
+      "id": "labor_ach_open_source",
+      "parent": "labor_achievement",
+      "name": "开源安全贡献实践",
+      "level": "group",
+      "cap": 10,
+      "aggregation": "highest",
+      "sort": 326,
+      "source_ref": "细则 P21-22 开源安全奖励计划院级竞赛"
+    },
+    {
+      "id": "labor_ach_open_source_rule",
+      "parent": "labor_ach_open_source",
+      "name": "开源安全奖励计划院级竞赛",
+      "level": "rule",
+      "calculator": "matrix",
+      "params": {
+        "dimensions": [
+          "award",
+          "role"
+        ],
+        "table": {
+          "excellent": {
+            "leader": 4,
+            "member": 3
+          },
+          "winner": {
+            "leader": 3,
+            "member": 2
+          }
+        },
+        "default": 0
+      },
+      "sort": 3261
+    },
+    {
+      "id": "labor_ach_veteran",
+      "parent": "labor_achievement",
+      "name": "退役复学",
+      "level": "rule",
+      "calculator": "boolean",
+      "params": {
+        "points": 10
+      },
+      "sort": 327,
+      "source_ref": "细则 P22 服役期间综合表现优异，赋 10 分"
+    },
+    {
+      "id": "innovation",
+      "parent": "quality",
+      "name": "创新素养",
+      "level": "category",
+      "cap": 45,
+      "aggregation": "sum",
+      "sort": 40,
+      "source_ref": "细则 P22 四、创新素养（上限 45 分）"
+    },
+    {
+      "id": "innovation_base",
+      "parent": "innovation",
+      "name": "基础素养",
+      "level": "section",
+      "cap": 5,
+      "aggregation": "sum",
+      "sort": 41,
+      "source_ref": "细则 P22 四（一）基础素养（上限 5 分）"
+    },
+    {
+      "id": "innovation_base_projects",
+      "parent": "innovation_base",
+      "name": "创新创业训练计划项目",
+      "level": "group",
+      "cap": 5,
+      "aggregation": "top_n",
+      "max_count": 2,
+      "sort": 411,
+      "source_ref": "细则 P22 项目表格；每类最多累加 2 项"
+    },
+    {
+      "id": "innovation_base_projects_rule",
+      "parent": "innovation_base_projects",
+      "name": "创新创业训练计划项目",
+      "level": "rule",
+      "calculator": "matrix",
+      "params": {
+        "dimensions": [
+          "level",
+          "role"
+        ],
+        "table": {
+          "national": {
+            "host": 4,
+            "first3": 0.8,
+            "other": 0.5
+          },
+          "provincial": {
+            "host": 3,
+            "first3": 0.5,
+            "other": 0.3
+          },
+          "school": {
+            "host": 2,
+            "first3": 0.3,
+            "other": 0.2
+          },
+          "college": {
+            "host": 1,
+            "first3": 0.2,
+            "other": 0
+          }
+        },
+        "default": 0
+      },
+      "sort": 4111
+    },
+    {
+      "id": "innovation_base_papers",
+      "parent": "innovation_base",
+      "name": "论文",
+      "level": "group",
+      "cap": 5,
+      "aggregation": "top_n",
+      "max_count": 2,
+      "sort": 412,
+      "source_ref": "细则 P23 论文表格；每类最多累加 2 项"
+    },
+    {
+      "id": "innovation_base_papers_rule",
+      "parent": "innovation_base_papers",
+      "name": "论文",
+      "level": "rule",
+      "calculator": "paper",
+      "params": {
+        "core_first_points": 5,
+        "core_cofirst_total": 5,
+        "max_points": 5
+      },
+      "sort": 4121
+    },
+    {
+      "id": "innovation_base_patents",
+      "parent": "innovation_base",
+      "name": "专利",
+      "level": "group",
+      "cap": 5,
+      "aggregation": "top_n",
+      "max_count": 2,
+      "sort": 413,
+      "source_ref": "细则 P23 专利表格；每类最多累加 2 项"
+    },
+    {
+      "id": "innovation_base_patents_rule",
+      "parent": "innovation_base_patents",
+      "name": "专利",
+      "level": "rule",
+      "calculator": "matrix",
+      "params": {
+        "dimensions": [
+          "patent_type",
+          "transfer",
+          "role"
+        ],
+        "table": {
+          "invention": {
+            "yes": {
+              "first": 5,
+              "other": 0
+            },
+            "no": {
+              "first": 2.5,
+              "other": 0
+            }
+          },
+          "utility": {
+            "yes": {
+              "first": 2,
+              "other": 0
+            },
+            "no": {
+              "first": 1,
+              "other": 0
+            }
+          },
+          "appearance": {
+            "yes": {
+              "first": 0.5,
+              "other": 0
+            },
+            "no": {
+              "first": 0.25,
+              "other": 0
+            }
+          }
+        },
+        "default": 0
+      },
+      "sort": 4131
+    },
+    {
+      "id": "innovation_base_competition",
+      "parent": "innovation_base",
+      "name": "创新创业竞赛",
+      "level": "group",
+      "cap": 5,
+      "aggregation": "top_n",
+      "max_count": 3,
+      "dedupe_by": "project_key",
+      "sort": 414,
+      "source_ref": "细则 P23-25 创新创业竞赛；最多 3 项，项目重复取最高奖"
+    },
+    {
+      "id": "innovation_base_competition_rule",
+      "parent": "innovation_base_competition",
+      "name": "创新创业竞赛获奖",
+      "level": "rule",
+      "calculator": "competition",
+      "params": {
+        "class_divisors": {
+          "A": 1,
+          "A*": 1,
+          "A-": 2,
+          "A-*": 2,
+          "B": 3,
+          "B*": 3,
+          "C": 4,
+          "D": 8,
+          "E": 16
+        },
+        "rank_limits": {
+          "A": 99,
+          "A*": 99,
+          "A-": 9,
+          "A-*": 9,
+          "B": 7,
+          "B*": 7,
+          "C": 5,
+          "D": 3,
+          "E": 1
+        },
+        "base_table": {
+          "national_first": [
+            5,
+            5,
+            4,
+            3,
+            2,
+            1
+          ],
+          "national_second": [
+            4,
+            4,
+            2,
+            1.5,
+            1,
+            0.5
+          ],
+          "national_third_or_provincial_first": [
+            3,
+            3,
+            1.5,
+            1,
+            0.5,
+            0.25
+          ],
+          "provincial_second_or_school_first": [
+            2,
+            2,
+            1,
+            0.5,
+            0.25,
+            0
+          ],
+          "school_second": [
+            1,
+            1,
+            0.5,
+            0.25,
+            0,
+            0
+          ]
+        },
+        "team_size_threshold": 3,
+        "default": 0
+      },
+      "sort": 4141
+    },
+    {
+      "id": "innovation_base_entrepreneurship",
+      "parent": "innovation_base",
+      "name": "创业实践",
+      "level": "group",
+      "cap": 5,
+      "aggregation": "top_n",
+      "max_count": 1,
+      "sort": 415,
+      "source_ref": "细则 P25 创业实践；最多 1 个创业公司"
+    },
+    {
+      "id": "innovation_base_entrepreneurship_rule",
+      "parent": "innovation_base_entrepreneurship",
+      "name": "创业公司",
+      "level": "rule",
+      "calculator": "entrepreneurship",
+      "params": {
+        "legal_rep_points_full": 4,
+        "legal_rep_points_half": 2,
+        "shareholder_points": 1,
+        "full_months": 12,
+        "half_months": 6,
+        "legal_rep_min_equity": 30,
+        "shareholder_min_equity": 10
+      },
+      "sort": 4151
+    },
+    {
+      "id": "innovation_base_overseas",
+      "parent": "innovation_base",
+      "name": "境外学术交流",
+      "level": "group",
+      "cap": 5,
+      "aggregation": "highest",
+      "sort": 416,
+      "source_ref": "细则 P25 境外学术交流；长期最高 5 分，短期最高 3 分"
+    },
+    {
+      "id": "innovation_base_overseas_rule",
+      "parent": "innovation_base_overseas",
+      "name": "境外学术交流",
+      "level": "rule",
+      "calculator": "overseas",
+      "params": {
+        "long_days": 90,
+        "long_max": 5,
+        "short_max": 3
+      },
+      "sort": 4161
+    },
+    {
+      "id": "innovation_breakthrough",
+      "parent": "innovation",
+      "name": "突破提升",
+      "level": "section",
+      "cap": 40,
+      "aggregation": "sum",
+      "sort": 42,
+      "source_ref": "细则 P25-29 四（二）突破提升（上限 40 分）"
+    },
+    {
+      "id": "innovation_bt_research",
+      "parent": "innovation_breakthrough",
+      "name": "科研成果",
+      "level": "group",
+      "cap": 40,
+      "aggregation": "highest",
+      "sort": 421,
+      "source_ref": "细则 P26-27 科研成果；答辩满分 40 分，共同第一作者均分"
+    },
+    {
+      "id": "innovation_bt_research_rule",
+      "parent": "innovation_bt_research",
+      "name": "科研论文答辩",
+      "level": "rule",
+      "calculator": "research_defense",
+      "params": {
+        "max_score": 40
+      },
+      "sort": 4211
+    },
+    {
+      "id": "innovation_bt_competition",
+      "parent": "innovation_breakthrough",
+      "name": "竞赛获奖",
+      "level": "group",
+      "cap": 40,
+      "aggregation": "highest",
+      "sort": 422,
+      "source_ref": "细则 P27-28 突破提升竞赛；主力队员前三名"
+    },
+    {
+      "id": "innovation_bt_competition_rule",
+      "parent": "innovation_bt_competition",
+      "name": "突破提升竞赛",
+      "level": "rule",
+      "calculator": "breakthrough_competition",
+      "params": {
+        "awards": {
+          "A": {
+            "national_first": 40,
+            "national_second": 30,
+            "national_third": 10
+          },
+          "A*": {
+            "national_first": 40,
+            "national_second": 30,
+            "national_third": 10
+          },
+          "A-": {
+            "national_first": 20,
+            "national_second": 10
+          },
+          "A-*": {
+            "national_first": 20,
+            "national_second": 10
+          }
+        },
+        "default": 0
+      },
+      "sort": 4221
+    },
+    {
+      "id": "innovation_bt_internship",
+      "parent": "innovation_breakthrough",
+      "name": "国际组织实习",
+      "level": "group",
+      "cap": 40,
+      "aggregation": "highest",
+      "sort": 423,
+      "source_ref": "细则 P28-29 国际组织实习；线上实习减 8 分"
+    },
+    {
+      "id": "innovation_bt_internship_rule",
+      "parent": "innovation_bt_internship",
+      "name": "国际组织实习",
+      "level": "rule",
+      "calculator": "internship",
+      "params": {
+        "domestic_3m": 24,
+        "domestic_6m": 32,
+        "overseas_3m": 40,
+        "online_penalty": 8
+      },
+      "sort": 4231
+    }
+  ]
+}

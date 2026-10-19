@@ -1,0 +1,43 @@
+[project]
+name = "sdu-ce-ledger"
+version = "0.1.0"
+description = "山东大学网络空间安全学院本科生综合测评加分账本"
+requires-python = ">=3.12"
+dependencies = [
+    "flet==1.0.4",
+    "platformdirs>=4",
+    "pymupdf==1.27.2.3",
+    "rapidocr==3.10.0",
+    "onnxruntime==1.27.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pyyaml>=6",
+    "ruff>=0.6",
+]
+
+[tool.flet.app]
+path = "src"
+module = "main"
+
+[tool.flet]
+product = "综合测评账本"
+org = "com.sdu.celedger"
+
+[tool.flet.android]
+extract_packages = ["rapidocr"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+exclude = ["build", ".venv", ".pytest_cache", ".ruff_cache"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
