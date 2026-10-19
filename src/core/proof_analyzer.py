@@ -96,7 +96,7 @@ KEYWORDS: tuple[_RuleKeywords, ...] = (
     ),
     _RuleKeywords(
         "labor_base_practice",
-        {"社会实践": 4, "实践考核": 4, "寒暑假社会实践": 4},
+        {"社会实践": 4, "实践考核": 4, "寒暑假社会实践": 4, "三下乡": 4},
     ),
     _RuleKeywords(
         "labor_base_volunteer",
@@ -195,6 +195,10 @@ KEYWORDS: tuple[_RuleKeywords, ...] = (
             "挑战杯": 7,
             "数学建模": 7,
             "竞赛": 3,
+            "大赛": 2,
+            "技能大赛": 6,
+            "网络安全大赛": 6,
+            "学科竞赛": 4,
             "创新创业大赛": 6,
             "CTF": 6,
             "网络安全竞赛": 6,
@@ -265,6 +269,9 @@ GENERIC_TITLES = {
 
 BODY_PATTERNS = (
     re.compile(
+        r"(?:活动名称|项目名称|竞赛名称|比赛名称)[:：]?\s*([^\n，。；,.;:]{2,60})"
+    ),
+    re.compile(
         r"(?:参加|参与|参加了|参与了)([^，。；,.;:\n]{4,60}?)(?=[，。；,.;:]|并|荣获|获得|取得|$)"
     ),
     re.compile(r"在([^，。；,.;:\n]{4,60}?)(?:中|上)(?=[，。；,.;:]|荣获|获得|取得|表现)"),
@@ -288,21 +295,114 @@ def extract_pdf_text(pdf_bytes: bytes) -> str:
         doc.close()
 
 
-_ocr_engine = None
+_ocr_engines: dict[int, object] = {}
 
 
-def _get_ocr_engine():
-    global _ocr_engine
-    if _ocr_engine is None:
+def _get_ocr_engine(max_side: int = 1024):
+    engine = _ocr_engines.get(max_side)
+    if engine is None:
         from rapidocr import RapidOCR
 
-        _ocr_engine = RapidOCR(
+        engine = RapidOCR(
             params={
-                "Global.max_side_len": 1024,
+                "Global.max_side_len": max_side,
                 "Global.log_level": "error",
             }
         )
-    return _ocr_engine
+        _ocr_engines[max_side] = engine
+    return engine
+
+
+def _render_png(page, dpi: int) -> bytes:
+    import pymupdf
+
+    pix = page.get_pixmap(dpi=dpi, colorspace=pymupdf.csRGB, alpha=False)
+    return pix.tobytes("png")
+
+
+def _ocr_png(engine, png: bytes, *, use_cls: bool) -> str:
+    result = engine(png, use_cls=use_cls)
+    lines = []
+    for text in getattr(result, "txts", None) or ():
+        if text and text.strip():
+            lines.append(text.strip())
+    return "\n".join(lines)
+
+
+def _text_score(text: str) -> int:
+    cjk = len(re.findall(r"[\u4e00-\u9fff]", text))
+    bonus = 5 * sum(
+        1
+        for word in (
+            "参加",
+            "参与",
+            "竞赛",
+            "比赛",
+            "活动",
+            "志愿",
+            "实践",
+            "证书",
+            "证明",
+            "荣获",
+            "获得",
+        )
+        if word in text
+    )
+    return cjk + bonus
+
+
+def _needs_quality(text: str) -> bool:
+    return _text_score(text) < 20 or not any(
+        word in text
+        for word in (
+            "参加",
+            "参与",
+            "竞赛",
+            "比赛",
+            "活动",
+            "志愿",
+            "实践",
+            "证书",
+            "证明",
+            "荣获",
+            "获得",
+        )
+    )
+
+
+def _rotate_png(png: bytes, angle: int) -> bytes:
+    from io import BytesIO
+
+    from PIL import Image
+
+    image = Image.open(BytesIO(png))
+    image = image.rotate(angle, expand=True)
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def _ocr_page(page, dpi: int) -> str:
+    fast_engine = _get_ocr_engine(1024)
+    png = _render_png(page, dpi)
+    text = _ocr_png(fast_engine, png, use_cls=False)
+    if not _needs_quality(text):
+        return text
+
+    quality_engine = _get_ocr_engine(1600)
+    best_text = text
+    best_score = _text_score(text)
+    quality_png = _render_png(page, 200)
+    for angle in (0, 90, 180, 270):
+        candidate_png = quality_png if angle == 0 else _rotate_png(quality_png, angle)
+        candidate = _ocr_png(quality_engine, candidate_png, use_cls=True)
+        score = _text_score(candidate)
+        if score > best_score:
+            best_text = candidate
+            best_score = score
+        if not _needs_quality(candidate):
+            break
+    return best_text
 
 
 def ocr_pdf_text(
@@ -317,15 +417,7 @@ def ocr_pdf_text(
     try:
         if len(doc) == 0:
             return ""
-        engine = _get_ocr_engine()
-        lines: list[str] = []
-        for page in doc[:max_pages]:
-            pix = page.get_pixmap(dpi=dpi, colorspace=pymupdf.csRGB, alpha=False)
-            result = engine(pix.tobytes("png"), use_cls=False)
-            for text in getattr(result, "txts", None) or ():
-                if text and text.strip():
-                    lines.append(text.strip())
-        return "\n".join(lines)
+        return "\n".join(_ocr_page(page, dpi) for page in doc[:max_pages])
     finally:
         doc.close()
 

@@ -87,7 +87,7 @@ def test_pdf_to_jpgs_and_export(tmp_path):
     assert files[0].exists()
 
 
-def _make_scanned_pdf(text: str) -> bytes:
+def _make_scanned_pdf(text: str, *, rotate: int = 0) -> bytes:
     source = pymupdf.open()
     source_page = source.new_page(width=900, height=400)
     source_page.insert_text(
@@ -97,8 +97,20 @@ def _make_scanned_pdf(text: str) -> bytes:
     png = pix.tobytes("png")
     source.close()
 
+    width, height = 900, 400
+    if rotate:
+        from io import BytesIO
+
+        from PIL import Image
+
+        image = Image.open(BytesIO(png)).rotate(rotate, expand=True)
+        buffer = BytesIO()
+        image.save(buffer, format="PNG")
+        png = buffer.getvalue()
+        width, height = image.size
+
     doc = pymupdf.open()
-    page = doc.new_page(width=900, height=400)
+    page = doc.new_page(width=width, height=height)
     page.insert_image(page.rect, stream=png)
     data = doc.tobytes()
     doc.close()
@@ -143,3 +155,30 @@ def test_title_from_body_with_in_pattern(rules):
 def test_generic_title_not_used(rules):
     suggestion = suggest_from_text("参与证明\n2025年9月", rules)
     assert suggestion.title is None
+
+
+def test_title_from_activity_label(rules):
+    suggestion = suggest_from_text(
+        "参与证明\n活动名称：2025年暑期社会实践\n兹证明李四同学参加“乡村振兴”实践活动。\n2025年8月",
+        rules,
+    )
+    assert suggestion.title == "2025年暑期社会实践"
+    assert suggestion.rule_id == "labor_base_practice"
+
+
+def test_skill_competition_title_and_rule(rules):
+    suggestion = suggest_from_text(
+        "获奖证书\n张三同学在2025年山东省大学生网络安全技能大赛中获得一等奖。\n2025年10月",
+        rules,
+    )
+    assert suggestion.title == "2025年山东省大学生网络安全技能大赛"
+    assert suggestion.rule_id == "innovation_base_competition_rule"
+
+
+def test_analyze_scanned_pdf_rotated(rules):
+    for angle in (90, 180):
+        data = _make_scanned_pdf("全国大学生数学建模竞赛 2025年9月", rotate=angle)
+        suggestion = analyze_pdf(data, rules)
+        assert suggestion.rule_id == "innovation_base_competition_rule"
+        assert suggestion.activity_date == "2025-09-01"
+        assert "数学建模" in suggestion.text
