@@ -7,3 +7,7 @@ __pycache__/
 .DS_Store
 *.log
 *.apk
+
+# Official source documents (kept locally, not in repo)
+*.pdf
+*.docx
