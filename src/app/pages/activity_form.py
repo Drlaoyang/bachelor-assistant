@@ -168,7 +168,10 @@ class ActivityForm:
             first_data = self.staged_files[0][1]
             try:
                 suggestion = await asyncio.to_thread(
-                    analyze_pdf, first_data, self.state.rules
+                    analyze_pdf,
+                    first_data,
+                    self.state.rules,
+                    self.state.academic_year,
                 )
             except Exception as exc:
                 self.app.notify(f"已选择 {len(self.staged_files)} 个 PDF；分析失败：{exc}")

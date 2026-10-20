@@ -33,7 +33,9 @@ KEYWORDS: tuple[_RuleKeywords, ...] = (
         {
             "体育": 2,
             "心理": 2,
-            "运动会": 2,
+            "运动会": 4,
+            "秋日运动会": 5,
+            "乐享运动": 4,
             "篮球": 3,
             "足球": 3,
             "排球": 3,
@@ -272,16 +274,19 @@ BODY_PATTERNS = (
         r"(?:活动名称|项目名称|竞赛名称|比赛名称)[:：]?\s*([^\n，。；,.;:]{2,60})"
     ),
     re.compile(
-        r"(?:参加|参与|参加了|参与了)([^，。；,.;:\n]{4,60}?)(?=[，。；,.;:]|并|荣获|获得|取得|$)"
+        r"(?:参加|参与|参加了|参与了)(?!证明)([^，。；,.;:\n]{4,60}?)(?=[，。；,.;:]|并|荣获|获得|取得|$)"
     ),
-    re.compile(r"在([^，。；,.;:\n]{4,60}?)(?:中|上)(?=[，。；,.;:]|荣获|获得|取得|表现)"),
+    re.compile(r"在([^。；\n]{4,80}?)(?:中|上)(?=[，。；,.;:]|荣获|获得|取得|表现)"),
     re.compile(
         r"([^，。；,.;:\n]{4,60}?)(?:竞赛|比赛|活动|项目)(?:中|上)?(?:荣获|获得|取得)"
     ),
 )
 
+TITLE_PREFIX_RE = re.compile(r"^(?:山东大学网络空间安全学院|山东大学|网络空间安全学院)+")
+
 DATE_RE = re.compile(r"(20\d{2})\s*[年./-]\s*(\d{1,2})\s*[月./-]\s*(\d{1,2})")
 MONTH_RE = re.compile(r"(20\d{2})\s*年\s*(\d{1,2})\s*月")
+DATE_MD_RE = re.compile(r"(\d{1,2})\s*月\s*(\d{1,2})\s*日")
 TITLE_STRIP_RE = re.compile(r"(获奖|荣誉|参赛|活动|实践)?(证书|证明书|证明)$")
 
 
@@ -382,11 +387,11 @@ def _rotate_png(png: bytes, angle: int) -> bytes:
     return buffer.getvalue()
 
 
-def _ocr_page(page, dpi: int) -> str:
+def _ocr_page(page, dpi: int, *, fast_only: bool = False) -> str:
     fast_engine = _get_ocr_engine(1024)
     png = _render_png(page, dpi)
-    text = _ocr_png(fast_engine, png, use_cls=False)
-    if not _needs_quality(text):
+    text = _ocr_png(fast_engine, png, use_cls=fast_only)
+    if fast_only or not _needs_quality(text):
         return text
 
     quality_engine = _get_ocr_engine(1600)
@@ -410,6 +415,8 @@ def ocr_pdf_text(
     *,
     dpi: int = 120,
     max_pages: int = 1,
+    page_indexes: list[int] | None = None,
+    fast_only: bool = False,
 ) -> str:
     import pymupdf
 
@@ -417,12 +424,57 @@ def ocr_pdf_text(
     try:
         if len(doc) == 0:
             return ""
-        return "\n".join(_ocr_page(page, dpi) for page in doc[:max_pages])
+        indexes = (
+            page_indexes
+            if page_indexes is not None
+            else list(range(min(max_pages, len(doc))))
+        )
+        return "\n".join(
+            _ocr_page(doc[index], dpi, fast_only=fast_only)
+            for index in indexes
+            if 0 <= index < len(doc)
+        )
     finally:
         doc.close()
 
 
-def _extract_date(text: str) -> str | None:
+def _pdf_page_count(pdf_bytes: bytes) -> int:
+    import pymupdf
+
+    doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+    try:
+        return len(doc)
+    finally:
+        doc.close()
+
+
+def ocr_last_page_text(pdf_bytes: bytes, *, dpi: int = 120) -> str:
+    from io import BytesIO
+
+    import pymupdf
+    from PIL import Image
+
+    doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+    try:
+        if len(doc) == 0:
+            return ""
+        page = doc[-1]
+        png = _render_png(page, dpi)
+        image = Image.open(BytesIO(png))
+        width, height = image.size
+        bottom = image.crop((0, int(height * 0.75), width, height))
+        buffer = BytesIO()
+        bottom.save(buffer, format="PNG")
+        engine = _get_ocr_engine(1024)
+        text = _ocr_png(engine, buffer.getvalue(), use_cls=True)
+        if DATE_RE.search(text) or MONTH_RE.search(text) or DATE_MD_RE.search(text):
+            return text
+        return _ocr_page(page, dpi, fast_only=True)
+    finally:
+        doc.close()
+
+
+def _extract_date(text: str, academic_year: str | None = None) -> str | None:
     match = DATE_RE.search(text)
     if match:
         year, month, day = (int(part) for part in match.groups())
@@ -433,12 +485,20 @@ def _extract_date(text: str) -> str | None:
         year, month = (int(part) for part in match.groups())
         if 1 <= month <= 12:
             return f"{year:04d}-{month:02d}-01"
+    match = DATE_MD_RE.search(text)
+    if match and academic_year:
+        month, day = (int(part) for part in match.groups())
+        if 1 <= month <= 12 and 1 <= day <= 31:
+            start_year = int(academic_year.split("-")[0])
+            year = start_year if month >= 9 else start_year + 1
+            return f"{year:04d}-{month:02d}-{day:02d}"
     return None
 
 
 def _clean_title(value: str) -> str | None:
     title = re.sub(r"\s+", " ", value).strip()
     title = re.sub(r"^(兹证明|特此证明)[:：]?", "", title).strip()
+    title = TITLE_PREFIX_RE.sub("", title).strip()
     title = title.strip("，。；：:、,.; ")
     if title.startswith("了"):
         title = title[1:].strip()
@@ -454,12 +514,19 @@ def _clean_title(value: str) -> str | None:
 
 def _extract_title(text: str, rule_name: str | None) -> str | None:
     lines = [re.sub(r"\s+", " ", line).strip() for line in text.splitlines()]
+    compact = re.sub(r"\s+", "", text)
 
-    for pattern in BODY_PATTERNS:
-        for line in lines:
-            if line.startswith(("兹证明", "特此证明")):
-                line = re.sub(r"^(兹证明|特此证明)[:：]?", "", line).strip()
-            match = pattern.search(line)
+    label_pattern = BODY_PATTERNS[0]
+    for line in lines:
+        match = label_pattern.search(line)
+        if match:
+            title = _clean_title(match.group(1))
+            if title:
+                return title
+
+    for pattern in BODY_PATTERNS[1:]:
+        for candidate_text in (compact, *lines):
+            match = pattern.search(candidate_text)
             if match:
                 title = _clean_title(match.group(1))
                 if title:
@@ -522,7 +589,11 @@ def _extract_title(text: str, rule_name: str | None) -> str | None:
     return _clean_title(best[2])
 
 
-def suggest_from_text(text: str, rules: RuleSet) -> ProofSuggestion:
+def suggest_from_text(
+    text: str,
+    rules: RuleSet,
+    academic_year: str | None = None,
+) -> ProofSuggestion:
     normalized = unicodedata.normalize("NFKC", text).replace("\u3000", " ").strip()
     compact = re.sub(r"\s+", "", normalized)
     if len(compact) < 10:
@@ -549,7 +620,7 @@ def suggest_from_text(text: str, rules: RuleSet) -> ProofSuggestion:
     title = _extract_title(normalized, rule_name)
     if title is None:
         notes.append("未能自动识别活动名称，请手动填写")
-    activity_date = _extract_date(compact)
+    activity_date = _extract_date(compact, academic_year)
     if activity_date is None:
         notes.append("未能自动识别活动日期，请手动填写")
 
@@ -568,7 +639,11 @@ def suggest_from_text(text: str, rules: RuleSet) -> ProofSuggestion:
     )
 
 
-def analyze_pdf(pdf_bytes: bytes, rules: RuleSet) -> ProofSuggestion:
+def analyze_pdf(
+    pdf_bytes: bytes,
+    rules: RuleSet,
+    academic_year: str | None = None,
+) -> ProofSuggestion:
     try:
         text = extract_pdf_text(pdf_bytes)
     except Exception as exc:
@@ -582,7 +657,17 @@ def analyze_pdf(pdf_bytes: bytes, rules: RuleSet) -> ProofSuggestion:
         except Exception as exc:
             return ProofSuggestion(notes=[f"PDF 无文字，OCR 失败：{exc}"])
 
-    suggestion = suggest_from_text(text, rules)
+    if used_ocr and _extract_date(text, academic_year) is None:
+        try:
+            count = _pdf_page_count(pdf_bytes)
+            if count > 1:
+                last_text = ocr_last_page_text(pdf_bytes)
+                if last_text.strip():
+                    text = f"{text}\n{last_text}"
+        except Exception:
+            pass
+
+    suggestion = suggest_from_text(text, rules, academic_year)
     if used_ocr:
         suggestion.notes.append("已使用本地 OCR 识别扫描件首页，请核对识别结果")
     return suggestion

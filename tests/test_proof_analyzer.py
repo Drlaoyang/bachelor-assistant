@@ -40,7 +40,7 @@ def test_suggest_social_work_honor(rules):
         "山东大学2024-2025学年优秀学生干部证书\n2025年10月", rules
     )
     assert suggestion.rule_id == "labor_ach_social_work_personal"
-    assert suggestion.title == "山东大学2024-2025学年优秀学生干部"
+    assert suggestion.title == "2024-2025学年优秀学生干部"
 
 
 def test_suggest_fitness(rules):
@@ -182,3 +182,51 @@ def test_analyze_scanned_pdf_rotated(rules):
         assert suggestion.rule_id == "innovation_base_competition_rule"
         assert suggestion.activity_date == "2025-09-01"
         assert "数学建模" in suggestion.text
+
+
+def test_wrapped_sports_title_and_month_day_date(rules):
+    suggestion = suggest_from_text(
+        "参与证明\n"
+        "兹证明，以下同学在山东大学网络空间安全学院2026“相约秋日，乐享运动”秋日\n"
+        "运动会中表现优异，态度认真：\n"
+        "10月18日",
+        rules,
+        "2026-2027",
+    )
+    assert suggestion.rule_id == "physical_base_sports_rule"
+    assert "相约秋日" in (suggestion.title or "")
+    assert "运动会" in (suggestion.title or "")
+    assert suggestion.activity_date == "2026-10-18"
+
+
+def _make_two_page_scanned_pdf(first_text: str, last_text: str) -> bytes:
+    source = pymupdf.open()
+    first_page = source.new_page(width=900, height=1200)
+    y = 100
+    for line in first_text.splitlines():
+        first_page.insert_text((60, y), line, fontname="china-s", fontsize=26)
+        y += 56
+    last_page = source.new_page(width=900, height=1200)
+    last_page.insert_text((60, 300), last_text, fontname="china-s", fontsize=34)
+
+    doc = pymupdf.open()
+    for source_page in source:
+        pix = source_page.get_pixmap(
+            dpi=150, colorspace=pymupdf.csRGB, alpha=False
+        )
+        page = doc.new_page(width=900, height=1200)
+        page.insert_image(page.rect, stream=pix.tobytes("png"))
+    data = doc.tobytes()
+    doc.close()
+    source.close()
+    return data
+
+
+def test_last_page_ocr_provides_date(rules):
+    data = _make_two_page_scanned_pdf(
+        "参与证明\n兹证明，以下同学参加2026秋日运动会，表现优异。",
+        "10月18日",
+    )
+    suggestion = analyze_pdf(data, rules, "2026-2027")
+    assert suggestion.rule_id == "physical_base_sports_rule"
+    assert suggestion.activity_date == "2026-10-18"
