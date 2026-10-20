@@ -11,3 +11,6 @@ __pycache__/
 # Official source documents (kept locally, not in repo)
 *.pdf
 *.docx
+
+# Release artifacts (APK stays local; attach manually to a GitHub release)
+dist/
