@@ -36,3 +36,18 @@ def points_from_1e4(value: int | str) -> Decimal:
 def format_points(value: Any) -> str:
     text = format(quantize_points(value), "f").rstrip("0").rstrip(".")
     return text or "0"
+
+
+def format_score(value: Any) -> str:
+    text = format(quantize_points(value), "f").rstrip("0").rstrip(".")
+    if "." not in text:
+        text += ".0"
+    return text or "0.0"
+
+
+def format_percent(counted: Any, cap: Any) -> str:
+    cap_value = to_decimal(cap)
+    if cap_value == 0:
+        return "0.0%"
+    percent = to_decimal(counted) / cap_value * D("100")
+    return f"{percent:.1f}%"

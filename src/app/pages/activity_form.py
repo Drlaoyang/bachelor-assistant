@@ -8,7 +8,7 @@ from app.components.form_fields import DynamicForm
 from app.components.rule_picker import RulePicker
 from core.calculators import calculate
 from core.models import Activity as CoreActivity
-from core.points import format_points, to_decimal
+from core.points import format_points, format_score, to_decimal
 from core.proof_analyzer import ProofSuggestion, analyze_pdf
 from core.scoring import Scorer
 from device.files import save_evidence_blob
@@ -104,7 +104,7 @@ class ActivityForm:
     def preview(self) -> None:
         candidate = self._candidate()
         if candidate is None:
-            self.preview_text.value = "选择规则后实时显示计分预览。"
+            self.preview_text.value = "选择规则并填写条件后，这里显示实际加分。"
             self.page.update()
             return
         node = self.state.rules.get(candidate.rule_node_id)
@@ -113,8 +113,8 @@ class ActivityForm:
                 base = candidate.override_points
             else:
                 base = calculate(node.calculator, node.params, candidate.inputs)
-        except Exception as exc:
-            self.preview_text.value = f"计分失败：{exc}"
+        except Exception:
+            self.preview_text.value = "请先填写完整条件。"
             self.page.update()
             return
         scorer = Scorer(self.state.rules)
@@ -124,7 +124,6 @@ class ActivityForm:
             if activity.uuid != (self.activity_uuid or "")
         ]
         statuses = tuple(sorted(set(self.state.statuses) | {candidate.status}))
-        current_total = scorer.score(existing, self.state.statuses).total
         simulated = scorer.score([*existing, candidate], statuses)
         counted = next(
             (
@@ -134,11 +133,22 @@ class ActivityForm:
             ),
             base,
         )
-        gain = simulated.total - current_total
-        self.preview_text.value = (
-            f"应得 {format_points(base)} ｜ 计入 {format_points(counted)} ｜ "
-            f"边际加分 {format_points(gain)} ｜ 试算总分 {format_points(simulated.total)}"
-        )
+        if counted == 0:
+            self.preview_text.value = (
+                f"本项应得 {format_score(base)} 分，但相关上限已满，实际不再加分。"
+            )
+        elif counted < base:
+            self.preview_text.value = (
+                f"本项应得 {format_score(base)} 分；受上限限制，"
+                f"实际计入 {format_score(counted)} 分。"
+                f"加入后总分 {format_score(simulated.total)} 分。"
+            )
+        else:
+            self.preview_text.value = (
+                f"本项应得 {format_score(base)} 分，"
+                f"实际计入 {format_score(counted)} 分。"
+                f"加入后总分 {format_score(simulated.total)} 分。"
+            )
         self.page.update()
 
     # ------------------------------------------------------------------

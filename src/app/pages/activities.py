@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import flet as ft
 
-from core.points import format_points, points_from_1e4
+from core.points import format_score, points_from_1e4
 
 
 def build_activities(page: ft.Page, state, app) -> ft.Control:
@@ -44,7 +44,7 @@ def build_activities(page: ft.Page, state, app) -> ft.Control:
         }
         cards = []
         for row in rows:
-            points = format_points(points_from_1e4(row["computed_points_1e4"]))
+            points = format_score(points_from_1e4(row["computed_points_1e4"]))
             evidence_note = (
                 f"证明 {row['evidence_count']} 个" if row["evidence_count"] else "缺证明"
             )
