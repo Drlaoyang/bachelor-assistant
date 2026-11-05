@@ -35,6 +35,7 @@ class Activity:
     student_id: str | None = None
     activity_date: str | None = None
     notes: str | None = None
+    extra_rule_node_id: str | None = None
 
 
 @dataclass

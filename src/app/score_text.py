@@ -89,6 +89,13 @@ def describe_gain(
             return f"所属的「{failing.name}」已加满；{suffix}"
         return f"本项应得 {format_score(base)} 分，但实际不再增加总分。"
 
+    if gain > base:
+        return (
+            f"本项应得 {format_score(base)} 分；同时计入基础参与分，"
+            f"实际增加 {format_score(gain)} 分。"
+            f"加入后总分 {format_score(result.total)} 分。"
+        )
+
     if gain < base:
         return (
             f"本项应得 {format_score(base)} 分；受上限或取最高影响，"

@@ -48,6 +48,8 @@ def build_activities(page: ft.Page, state, app) -> ft.Control:
             evidence_note = (
                 f"证明 {row['evidence_count']} 个" if row["evidence_count"] else "缺证明"
             )
+            if row["extra_rule_node_id"]:
+                evidence_note += " · 含基础参与分"
             cards.append(
                 ft.Card(
                     ft.Container(

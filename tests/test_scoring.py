@@ -482,3 +482,25 @@ def test_achievement_counts_after_base_full(scorer, make_activity):
     assert counted(result, "physical_base") == D("9")
     assert counted(result, "physical_achievement") == D("6")
     assert counted(result, "physical") == D("15")
+
+
+def test_extra_base_rule_counts_both_sections(scorer):
+    from core.models import Activity as CoreActivity
+
+    activity = CoreActivity(
+        uuid="extra-1",
+        rule_node_id="physical_achievement_sports",
+        title="体育获奖",
+        status="confirmed",
+        inputs={
+            "region": "national",
+            "track": "individual",
+            "result_type": "rank",
+            "result": "first",
+        },
+        extra_rule_node_id="physical_base_sports_rule",
+    )
+    result = score(scorer, [activity])
+    assert counted(result, "physical_base") == D("3")
+    assert counted(result, "physical_achievement") == D("6")
+    assert counted(result, "physical") == D("9")

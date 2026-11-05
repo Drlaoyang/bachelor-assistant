@@ -100,6 +100,7 @@ class Repository:
         notes: str = "",
         override_points: Any = None,
         override_reason: str | None = None,
+        extra_rule_node_id: str | None = None,
         academic_year: str = "",
         student_id: str = "",
     ) -> str:
@@ -110,15 +111,16 @@ class Repository:
         now = _now()
         self.conn.execute(
             "INSERT INTO activities(uuid, student_id, academic_year, rule_version,"
-            " rule_node_id, title, activity_date, status, inputs_json,"
+            " rule_node_id, extra_rule_node_id, title, activity_date, status, inputs_json,"
             " override_points_1e4, override_reason, notes, created_at, updated_at, device_id)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 new_uuid,
                 student_id,
                 academic_year,
                 version["id"],
                 rule_node_id,
+                extra_rule_node_id,
                 title,
                 activity_date,
                 status,
@@ -299,6 +301,7 @@ class Repository:
             student_id=row["student_id"],
             activity_date=row["activity_date"],
             notes=row["notes"],
+            extra_rule_node_id=row["extra_rule_node_id"],
         )
 
     def core_activities(

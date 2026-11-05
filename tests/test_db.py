@@ -126,3 +126,24 @@ def test_backup_roundtrip(repo, tmp_path):
     assert len(fresh.list_activities()) == 1
     assert fresh.list_activities()[0]["title"] == "活动A"
     fresh_conn.close()
+
+
+def test_extra_rule_node_persistence(repo):
+    repository, _ = repo
+    activity_uuid = repository.create_activity(
+        rule_node_id="physical_achievement_sports",
+        title="体育获奖",
+        status="confirmed",
+        inputs={
+            "region": "national",
+            "track": "individual",
+            "result_type": "rank",
+            "result": "first",
+        },
+        extra_rule_node_id="physical_base_sports_rule",
+        academic_year="2026-2027",
+    )
+    row = repository.get_activity(activity_uuid)
+    assert row["extra_rule_node_id"] == "physical_base_sports_rule"
+    core = repository.to_core_activity(row)
+    assert core.extra_rule_node_id == "physical_base_sports_rule"

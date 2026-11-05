@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Iterable
+from dataclasses import replace
 from decimal import Decimal
 
 from .calculators import calculate
@@ -37,6 +38,22 @@ class Scorer:
                 raise RuleError(f"活动 {activity.uuid} 关联的不是叶子规则: {activity.rule_node_id}")
             self._activities_by_rule[node.id].append(activity)
             filtered.append(activity)
+            if activity.extra_rule_node_id and activity.extra_rule_node_id != node.id:
+                extra_node = self.rules.get(activity.extra_rule_node_id)
+                if not self.rules.is_leaf(extra_node.id):
+                    raise RuleError(
+                        f"活动 {activity.uuid} 的关联规则不是叶子: "
+                        f"{activity.extra_rule_node_id}"
+                    )
+                extra = replace(
+                    activity,
+                    uuid=f"{activity.uuid}::extra",
+                    rule_node_id=activity.extra_rule_node_id,
+                    override_points=None,
+                    override_reason=None,
+                    extra_rule_node_id=None,
+                )
+                self._activities_by_rule[extra_node.id].append(extra)
 
         assert self.rules.root_id is not None
         root = self._score_node(self.rules.root_id)

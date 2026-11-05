@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections import defaultdict
+from decimal import Decimal
+
 from core.rules import RuleSet
 from core.scoring import Scorer
 from db.database import connect
@@ -45,8 +48,13 @@ class AppState:
     def compute(self):
         activities = self.repo.core_activities(self.academic_year)
         result = Scorer(self.rules).score(activities, self.statuses)
-        counted = {item.activity.uuid: item.counted for item in result.root.activity_scores}
-        self.repo.set_computed(counted)
+        counted: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
+        for item in result.root.activity_scores:
+            activity_uuid = item.activity.uuid
+            if activity_uuid.endswith("::extra"):
+                activity_uuid = activity_uuid[: -len("::extra")]
+            counted[activity_uuid] += item.counted
+        self.repo.set_computed(dict(counted))
         return result
 
     def core_activities(self):

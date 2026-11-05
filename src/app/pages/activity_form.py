@@ -15,6 +15,11 @@ from core.scoring import Scorer
 from device.files import save_evidence_blob
 from device.paths import data_paths
 
+EXTRA_BASE_RULES = {
+    "physical_achievement_sports": "physical_base_sports_rule",
+    "arts_achievement_awards": "arts_base_activities_rule",
+}
+
 
 class ActivityForm:
     def __init__(self, page: ft.Page, state, app, activity_uuid: str | None):
@@ -27,6 +32,12 @@ class ActivityForm:
         self._picker_attached = False
         self.form = DynamicForm(on_change=lambda _: self.preview())
         self.rule_picker = RulePicker(self.state.rules, self._on_rule_selected)
+        self.extra_base_check = ft.Checkbox(
+            label="同一活动同时计入基础参与分（3分）",
+            value=False,
+            visible=False,
+            on_change=lambda _: self.preview(),
+        )
         self.title_field = ft.TextField(label="标题", on_change=lambda _: self.preview())
         self.date_field = ft.TextField(
             label="日期", hint_text="YYYY-MM-DD", on_change=lambda _: self.preview()
@@ -53,6 +64,8 @@ class ActivityForm:
         if row is None:
             return
         self.rule_picker.set_leaf(row["rule_node_id"])
+        self.extra_base_check.visible = row["rule_node_id"] in EXTRA_BASE_RULES
+        self.extra_base_check.value = bool(row["extra_rule_node_id"])
         self.form.set_values(json.loads(row["inputs_json"] or "{}"))
         self.title_field.value = row["title"]
         self.date_field.value = row["activity_date"]
@@ -68,6 +81,13 @@ class ActivityForm:
 
     # ------------------------------------------------------------------
     def _on_rule_selected(self, leaf_id: str | None):
+        was_visible = self.extra_base_check.visible
+        extra_rule = EXTRA_BASE_RULES.get(leaf_id) if leaf_id else None
+        self.extra_base_check.visible = extra_rule is not None
+        if extra_rule is None:
+            self.extra_base_check.value = False
+        elif not was_visible:
+            self.extra_base_check.value = True
         if leaf_id:
             node = self.state.rules.get(leaf_id)
             self.form.build_for(node.calculator, node.params)
@@ -92,12 +112,16 @@ class ActivityForm:
                 override = to_decimal(self.override_points.value, "override")
             except Exception:
                 override = None
+        extra_rule = None
+        if self.extra_base_check.visible and self.extra_base_check.value:
+            extra_rule = EXTRA_BASE_RULES.get(node_id)
         return CoreActivity(
             uuid="__preview__",
             rule_node_id=node_id,
             title=self.title_field.value or "预览",
             status="confirmed",
             inputs=self.form.collect(),
+            extra_rule_node_id=extra_rule,
             override_points=override,
             override_reason=self.override_reason.value or None,
         )
@@ -289,6 +313,7 @@ class ActivityForm:
             notes=self.notes_field.value or "",
             override_points=candidate.override_points,
             override_reason=candidate.override_reason,
+            extra_rule_node_id=candidate.extra_rule_node_id,
         )
         if self.activity_uuid:
             self.state.repo.update_activity(self.activity_uuid, **fields)
@@ -339,6 +364,7 @@ class ActivityForm:
                 self.title_field,
                 self.date_field,
                 self.form,
+                self.extra_base_check,
                 self.notes_field,
                 self.override_check,
                 self.override_points,

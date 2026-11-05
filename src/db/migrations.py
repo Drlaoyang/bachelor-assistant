@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 SCHEMA_V1 = """
 CREATE TABLE IF NOT EXISTS meta (
@@ -87,5 +87,8 @@ def migrate(conn: sqlite3.Connection) -> None:
             " WHERE status IN ('pending', 'planned')"
         )
         version = 2
+    if version < 3:
+        conn.execute("ALTER TABLE activities ADD COLUMN extra_rule_node_id TEXT")
+        version = 3
     conn.execute(f"PRAGMA user_version = {version}")
     conn.commit()

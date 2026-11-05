@@ -5,6 +5,7 @@ import pytest
 
 from app.app import LedgerApp
 from app.state import AppState
+from core.points import D
 from core.proof_analyzer import ProofSuggestion
 
 
@@ -279,3 +280,35 @@ def test_preview_explains_full_category_does_not_block_others(app):
     form.preview()
     assert "「身心素养」已加满" in form.preview_text.value
     assert "其他分类仍可加分" in form.preview_text.value
+
+
+def test_extra_base_checkbox_adds_both_sections(app):
+    ledger, state, fake = app
+    state.repo.set_setting("onboarded", "1")
+    ledger.render()
+    ledger.open_activity_form(None)
+    form = ledger._activity_form
+    form.rule_picker.set_leaf("physical_achievement_sports")
+    assert form.extra_base_check.visible
+    assert form.extra_base_check.value is True
+    form.form.set_values(
+        {
+            "region": "national",
+            "track": "individual",
+            "result_type": "rank",
+            "result": "first",
+        }
+    )
+    form.title_field.value = "体育获奖"
+    form.preview()
+    assert "同时计入基础参与分" in form.preview_text.value
+    assert "实际增加 9.0" in form.preview_text.value
+
+    form.save(None)
+    rows = state.repo.list_activities(academic_year=state.academic_year)
+    assert len(rows) == 1
+    assert rows[0]["extra_rule_node_id"] == "physical_base_sports_rule"
+    assert rows[0]["computed_points_1e4"] == 90000
+    result = state.compute()
+    assert result.find("physical_base").counted == D("3")
+    assert result.find("physical_achievement").counted == D("6")
