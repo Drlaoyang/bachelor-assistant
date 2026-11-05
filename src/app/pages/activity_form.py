@@ -6,9 +6,10 @@ import flet as ft
 
 from app.components.form_fields import DynamicForm
 from app.components.rule_picker import RulePicker
+from app.score_text import describe_gain
 from core.calculators import calculate
 from core.models import Activity as CoreActivity
-from core.points import format_points, format_score, to_decimal
+from core.points import format_points, to_decimal
 from core.proof_analyzer import ProofSuggestion, analyze_pdf
 from core.scoring import Scorer
 from device.files import save_evidence_blob
@@ -124,31 +125,16 @@ class ActivityForm:
             if activity.uuid != (self.activity_uuid or "")
         ]
         statuses = tuple(sorted(set(self.state.statuses) | {candidate.status}))
+        current_total = scorer.score(existing, self.state.statuses).total
         simulated = scorer.score([*existing, candidate], statuses)
-        counted = next(
-            (
-                item.counted
-                for item in simulated.root.activity_scores
-                if item.activity.uuid == "__preview__"
-            ),
+        self.preview_text.value = describe_gain(
+            self.state.rules,
+            simulated,
+            "__preview__",
+            candidate.rule_node_id,
             base,
+            current_total,
         )
-        if counted == 0:
-            self.preview_text.value = (
-                f"本项应得 {format_score(base)} 分，但相关上限已满，实际不再加分。"
-            )
-        elif counted < base:
-            self.preview_text.value = (
-                f"本项应得 {format_score(base)} 分；受上限限制，"
-                f"实际计入 {format_score(counted)} 分。"
-                f"加入后总分 {format_score(simulated.total)} 分。"
-            )
-        else:
-            self.preview_text.value = (
-                f"本项应得 {format_score(base)} 分，"
-                f"实际计入 {format_score(counted)} 分。"
-                f"加入后总分 {format_score(simulated.total)} 分。"
-            )
         self.page.update()
 
     # ------------------------------------------------------------------

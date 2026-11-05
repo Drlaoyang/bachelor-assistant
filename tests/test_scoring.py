@@ -463,3 +463,22 @@ def test_manual_override(scorer, make_activity):
     result = score(scorer, [activity])
     assert counted(result, "physical_achievement") == D("4")
     assert result.find("physical_achievement").activity_scores[0].reason == "手动调整: 学院认定"
+
+
+def test_achievement_counts_after_base_full(scorer, make_activity):
+    activities = [
+        make_activity("physical_base_sports_rule") for _ in range(3)
+    ]
+    activities.append(
+        make_activity(
+            "physical_achievement_sports",
+            region="national",
+            track="individual",
+            result_type="rank",
+            result="first",
+        )
+    )
+    result = score(scorer, activities)
+    assert counted(result, "physical_base") == D("9")
+    assert counted(result, "physical_achievement") == D("6")
+    assert counted(result, "physical") == D("15")

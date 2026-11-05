@@ -217,3 +217,65 @@ def test_backup_export(app, tmp_path):
     target = tmp_path / "out.zip"
     export_backup(state.repo.conn, state.paths["evidence"], target)
     assert target.exists()
+
+
+def test_preview_counts_achievement_after_base_full(app):
+    ledger, state, fake = app
+    repo = state.repo
+    for _ in range(3):
+        repo.create_activity(
+            rule_node_id="physical_base_sports_rule",
+            title="基础活动",
+            status="confirmed",
+            inputs={},
+            academic_year=state.academic_year,
+        )
+    ledger.render()
+    ledger.open_activity_form(None)
+    form = ledger._activity_form
+    form.rule_picker.set_leaf("physical_achievement_sports")
+    form.form.set_values(
+        {
+            "region": "national",
+            "track": "individual",
+            "result_type": "rank",
+            "result": "first",
+        }
+    )
+    form.title_field.value = "体育获奖"
+    form.preview()
+    assert "实际增加 6.0" in form.preview_text.value
+
+
+def test_preview_explains_full_category_does_not_block_others(app):
+    ledger, state, fake = app
+    repo = state.repo
+    for _ in range(3):
+        repo.create_activity(
+            rule_node_id="physical_base_sports_rule",
+            title="基础活动",
+            status="confirmed",
+            inputs={},
+            academic_year=state.academic_year,
+        )
+    repo.create_activity(
+        rule_node_id="physical_achievement_sports",
+        title="体育获奖",
+        status="confirmed",
+        inputs={
+            "region": "national",
+            "track": "individual",
+            "result_type": "rank",
+            "result": "first",
+        },
+        academic_year=state.academic_year,
+    )
+    ledger.render()
+    ledger.open_activity_form(None)
+    form = ledger._activity_form
+    form.rule_picker.set_leaf("physical_base_fitness")
+    form.form.set_values({"grade": "优秀"})
+    form.title_field.value = "再加体测"
+    form.preview()
+    assert "「身心素养」已加满" in form.preview_text.value
+    assert "其他分类仍可加分" in form.preview_text.value

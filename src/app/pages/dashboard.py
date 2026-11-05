@@ -4,6 +4,7 @@ import flet as ft
 
 from app.components.form_fields import DynamicForm
 from app.components.rule_picker import RulePicker
+from app.score_text import describe_gain
 from core.calculators import calculate
 from core.points import format_percent, format_points, format_score
 
@@ -48,18 +49,49 @@ def build_dashboard(page: ft.Page, state, app) -> ft.Control:
     root = result.root
 
     alerts = []
-    for node in root.walk():
-        if node.cap is None or node.node_id == root.node_id:
-            continue
-        if node.remaining is not None and node.remaining == 0 and node.cap > 0:
-            alerts.append(f"{node.name} 已加满，不再加分")
-        elif (
-            node.remaining is not None
-            and node.cap
-            and node.cap > 0
-            and 0 < node.counted / node.cap >= 0.9
+    categories = list(root.children)
+    for category in categories:
+        if (
+            category.cap
+            and category.remaining is not None
+            and category.remaining == 0
         ):
-            alerts.append(f"{node.name} 快满了，还可加 {format_score(node.remaining)} 分")
+            other_rooms = [
+                child.name
+                for child in categories
+                if child.node_id != category.node_id
+                and child.remaining is not None
+                and child.remaining > 0
+            ]
+            suffix = "其他分类仍可加分" if other_rooms else "所有分类都已加满"
+            alerts.append(f"{category.name}已加满；{suffix}")
+            continue
+        for section in category.children:
+            if section.cap is None or section.cap <= 0:
+                continue
+            if section.remaining is not None and section.remaining == 0:
+                room = [
+                    child
+                    for child in category.children
+                    if child.node_id != section.node_id
+                    and child.remaining is not None
+                    and child.remaining > 0
+                ]
+                if room:
+                    extras = "；".join(
+                        f"{child.name}还可加 {format_score(child.remaining)} 分"
+                        for child in room[:2]
+                    )
+                    alerts.append(f"{section.name}已加满；{extras}")
+                else:
+                    alerts.append(f"{section.name}已加满；该二级项目不再加分")
+            elif (
+                section.remaining is not None
+                and 0 < section.counted / section.cap >= 0.9
+            ):
+                alerts.append(
+                    f"{section.name}快满了，还可加 {format_score(section.remaining)} 分"
+                )
 
     category_cards = []
     for category in root.children:
@@ -223,35 +255,21 @@ def _what_if(page: ft.Page, state, app) -> None:
             from core.scoring import Scorer
 
             scorer = Scorer(rules)
+            current_total = scorer.score(
+                state.core_activities(), state.statuses
+            ).total
             simulated = scorer.score(
                 [*state.core_activities(), candidate],
                 tuple(sorted(set(state.statuses) | {"confirmed"})),
             )
-            counted = next(
-                (
-                    item.counted
-                    for item in simulated.root.activity_scores
-                    if item.activity.uuid == "__what_if__"
-                ),
+            result_text.value = describe_gain(
+                rules,
+                simulated,
+                "__what_if__",
+                node_id,
                 base,
+                current_total,
             )
-            if counted == 0:
-                result_text.value = (
-                    f"本项应得 {format_score(base)} 分，但相关上限已满，"
-                    "实际不再加分。"
-                )
-            elif counted < base:
-                result_text.value = (
-                    f"本项应得 {format_score(base)} 分；受上限限制，"
-                    f"实际计入 {format_score(counted)} 分。"
-                    f"加入后总分 {format_score(simulated.total)} 分。"
-                )
-            else:
-                result_text.value = (
-                    f"本项应得 {format_score(base)} 分，"
-                    f"实际计入 {format_score(counted)} 分。"
-                    f"加入后总分 {format_score(simulated.total)} 分。"
-                )
         page.update()
 
     dialog.content = ft.Column([picker, form, result_text], tight=True, spacing=10, width=420)
