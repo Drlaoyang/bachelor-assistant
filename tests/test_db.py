@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -170,3 +171,23 @@ def test_sync_rules_updates_changed_rules(repo, tmp_path):
     assert stored_node["aggregation"] == "highest"
     assert len(repository.list_rule_versions()) == 2
     assert sync_rules(repository.conn, modified) is False
+
+
+def test_import_rejects_unknown_columns(repo, tmp_path):
+    repository, data_dir = repo
+    repository.set_setting("student_id", "20220001")
+    source = data_dir / "bad.zip"
+    with zipfile.ZipFile(source, "w") as zf:
+        zf.writestr("manifest.json", json.dumps({"schema_version": 3}))
+        zf.writestr(
+            "data/activities.json",
+            json.dumps([{"uuid": "x", "evil); DROP TABLE settings; --": "x"}]),
+        )
+    with pytest.raises(ValueError, match="未知字段"):
+        import_backup(
+            repository.conn,
+            data_dir / "evidence",
+            source,
+            data_dir / "backups",
+        )
+    assert repository.get_setting("student_id") == "20220001"

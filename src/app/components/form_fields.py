@@ -8,6 +8,13 @@ import flet as ft
 from app import form_schema as schema
 
 
+def _set_error(control: ft.Control, error: str | None) -> None:
+    if hasattr(control, "error_text"):
+        control.error_text = error
+    elif hasattr(control, "error"):
+        control.error = error
+
+
 class DynamicForm(ft.Column):
     def __init__(self, on_change: Callable | None = None):
         super().__init__(spacing=10, tight=True)
@@ -56,6 +63,34 @@ class DynamicForm(ft.Column):
             )
         self._controls[field.key] = control
         return control
+
+    def validate(self) -> list[str]:
+        errors: list[str] = []
+        for field in self._fields:
+            control = self._controls.get(field.key)
+            if control is None:
+                continue
+            error: str | None = None
+            if field.required and field.kind != "bool":
+                raw = "" if field.kind == "select" else str(control.value or "").strip()
+                if field.kind == "select":
+                    if control.value in (None, ""):
+                        error = "必填"
+                elif raw == "":
+                    error = "必填"
+                elif field.kind == "number":
+                    try:
+                        float(raw)
+                    except ValueError:
+                        error = "请输入数字"
+            _set_error(control, error)
+            if error:
+                errors.append(field.label)
+        return errors
+
+    def clear_errors(self) -> None:
+        for control in self._controls.values():
+            _set_error(control, None)
 
     def collect(self) -> dict[str, Any]:
         inputs: dict[str, Any] = {}

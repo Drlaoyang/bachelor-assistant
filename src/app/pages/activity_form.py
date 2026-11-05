@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
+from pathlib import Path
 
 import flet as ft
 
@@ -178,7 +180,7 @@ class ActivityForm:
         for f in files:
             data = f.bytes
             if data is None and f.path:
-                data = open(f.path, "rb").read()
+                data = Path(f.path).read_bytes()
             if data is not None:
                 self.staged_files.append((f.name, data))
         self._render_staged()
@@ -291,6 +293,24 @@ class ActivityForm:
         if not (self.title_field.value or "").strip():
             self.app.notify("请填写标题")
             return
+        if candidate.override_points is None:
+            errors = self.form.validate()
+            if errors:
+                self.page.update()
+                self.app.notify("请填写：" + "、".join(errors[:3]))
+                return
+        else:
+            self.form.clear_errors()
+        date_text = (self.date_field.value or "").strip()
+        self.date_field.error = None
+        if date_text:
+            try:
+                date_text = datetime.strptime(date_text, "%Y-%m-%d").date().isoformat()
+            except ValueError:
+                self.date_field.error = "格式应为 YYYY-MM-DD"
+                self.page.update()
+                self.app.notify("日期格式应为 YYYY-MM-DD")
+                return
         try:
             if candidate.override_points is not None:
                 pass
@@ -307,7 +327,7 @@ class ActivityForm:
         fields = dict(
             rule_node_id=candidate.rule_node_id,
             title=(self.title_field.value or "").strip(),
-            activity_date=(self.date_field.value or "").strip(),
+            activity_date=date_text,
             status=candidate.status,
             inputs=candidate.inputs,
             notes=self.notes_field.value or "",

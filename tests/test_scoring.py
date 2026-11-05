@@ -545,3 +545,25 @@ def test_arts_achievement_accumulates(scorer, make_activity):
     )
     assert counted(result, "arts_achievement") == D("5")
     assert counted(result, "arts") == D("5")
+
+
+def test_selection_tie_break_is_deterministic(scorer, make_activity):
+    activities = []
+    for uuid, date in [
+        ("a", "2026-01-01"),
+        ("b", "2026-01-01"),
+        ("c", "2026-01-02"),
+        ("d", "2026-01-01"),
+    ]:
+        activity = make_activity("physical_base_sports_rule")
+        activity.uuid = uuid
+        activity.activity_date = date
+        activities.append(activity)
+    result = score(scorer, activities)
+    group = result.find("physical_base_sports")
+    dropped = [
+        item.activity.uuid
+        for item in group.activity_scores
+        if item.counted == D("0") and "超过限项" in (item.reason or "")
+    ]
+    assert dropped == ["a"]

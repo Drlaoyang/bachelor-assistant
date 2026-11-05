@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 
 from core.rules import RuleSet
 
+MAX_OCR_PAGES = 5
+
 
 @dataclass
 class ProofSuggestion:
@@ -405,8 +407,6 @@ def _ocr_page(page, dpi: int, *, fast_only: bool = False) -> str:
         if score > best_score:
             best_text = candidate
             best_score = score
-        if not _needs_quality(candidate):
-            break
     return best_text
 
 
@@ -424,11 +424,10 @@ def ocr_pdf_text(
     try:
         if len(doc) == 0:
             return ""
-        indexes = (
-            page_indexes
-            if page_indexes is not None
-            else list(range(min(max_pages, len(doc))))
-        )
+        if page_indexes is not None:
+            indexes = page_indexes[:MAX_OCR_PAGES]
+        else:
+            indexes = list(range(min(max_pages, len(doc), MAX_OCR_PAGES)))
         return "\n".join(
             _ocr_page(doc[index], dpi, fast_only=fast_only)
             for index in indexes

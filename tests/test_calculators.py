@@ -103,6 +103,45 @@ def test_competition_matrix(rules):
                 "team_size": 5,
             },
         )
+    assert calculate(
+        "competition",
+        p,
+        {
+            "competition_class": "A*",
+            "award": "national_first",
+            "team_size": 3,
+        },
+    ) == D("5")
+    with pytest.raises(CalculationError):
+        calculate(
+            "competition",
+            p,
+            {
+                "competition_class": "A*",
+                "award": "national_first",
+                "team_size": 3,
+                "undergraduate_rank": 4,
+            },
+        )
+    with pytest.raises(CalculationError):
+        calculate(
+            "competition",
+            p,
+            {
+                "competition_class": "A*",
+                "award": "national_first",
+                "team_size": 0,
+            },
+        )
+    assert calculate(
+        "competition",
+        p,
+        {
+            "competition_class": "A*",
+            "award": "national_first",
+            "team_size": 1,
+        },
+    ) == D("5")
 
 
 def test_tiered_award_sports_mapping(rules):

@@ -149,6 +149,8 @@ def calc_competition(params: Params, inputs: Inputs) -> Decimal:
     award = str(_value(inputs, "award"))
     team_size = _int(_value(inputs, "team_size", required=False, default=1), "team_size")
     threshold = _int(params.get("team_size_threshold", 3), "team_size_threshold")
+    if team_size < 1:
+        raise CalculationError("团队本科生人数必须至少为 1")
     rank_value = _value(inputs, "undergraduate_rank", required=False, default=None)
     if rank_value is None:
         if team_size > threshold:
@@ -156,6 +158,8 @@ def calc_competition(params: Params, inputs: Inputs) -> Decimal:
         rank = 1
     else:
         rank = _int(rank_value, "undergraduate_rank")
+        if rank < 1 or rank > team_size:
+            raise CalculationError("本科生位次必须在 1 到团队人数之间")
 
     divisors = params["class_divisors"]
     if competition_class not in divisors:

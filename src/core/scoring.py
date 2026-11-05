@@ -157,7 +157,15 @@ class Scorer:
         }
 
         if node.aggregation == "highest" or node.max_count == 1:
-            ordered = sorted(candidates, key=lambda item: item.base, reverse=True)
+            ordered = sorted(
+                candidates,
+                key=lambda item: (
+                    item.base,
+                    item.activity.activity_date or "",
+                    item.activity.uuid,
+                ),
+                reverse=True,
+            )
             selected = ordered[:1]
             for item in ordered[1:]:
                 counted_map[item.activity.uuid] = (ZERO, "同类取最高，未计入")
@@ -179,7 +187,15 @@ class Scorer:
             else:
                 pool = list(candidates)
 
-            ordered = sorted(pool, key=lambda item: item.base, reverse=True)
+            ordered = sorted(
+                pool,
+                key=lambda item: (
+                    item.base,
+                    item.activity.activity_date or "",
+                    item.activity.uuid,
+                ),
+                reverse=True,
+            )
             limit = node.max_count or len(ordered)
             selected = ordered[:limit]
             for item in ordered[limit:]:
