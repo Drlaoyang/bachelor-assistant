@@ -36,7 +36,8 @@ def _node_progress(node) -> ft.Control:
         subtitle += f"；还可加 {format_score(node.remaining)} 分"
     return ft.Column(
         [
-            ft.Row([ft.Text(node.name, weight=ft.FontWeight.BOLD), ft.Text(subtitle, size=12)]),
+            ft.Text(node.name, weight=ft.FontWeight.BOLD),
+            ft.Text(subtitle, size=12),
             ft.ProgressBar(value=min(ratio, 1.0), color=color, bar_height=8),
         ],
         spacing=4,
@@ -107,17 +108,19 @@ def build_dashboard(page: ft.Page, state, app) -> ft.Control:
                                 ft.Text(
                                     f"{format_score(category.counted)} /"
                                     f" {format_points(category.cap)}",
-                                    size=22,
+                                    size=20,
                                     weight=ft.FontWeight.BOLD,
                                     color=color,
                                 ),
                                 ft.Text(
                                     format_percent(category.counted, category.cap),
-                                    size=14,
+                                    size=13,
                                     color=color,
                                 ),
                             ],
                             spacing=8,
+                            run_spacing=2,
+                            wrap=True,
                         ),
                         ft.ProgressBar(value=min(ratio, 1.0), color=color, bar_height=10),
                         ft.Column(
@@ -162,44 +165,56 @@ def build_dashboard(page: ft.Page, state, app) -> ft.Control:
             ),
             ft.Card(
                 ft.Container(
-                    ft.Row(
+                    ft.ResponsiveRow(
                         [
-                            ft.Column(
-                                [
-                                    ft.Text("素质能力得分", size=14),
-                                    ft.Row(
-                                        [
-                                            ft.Text(
-                                                f"{format_score(root.counted)} /"
-                                                f" {format_points(root.cap or 100)}",
-                                                size=34,
-                                                weight=ft.FontWeight.BOLD,
-                                            ),
-                                            ft.Text(
-                                                format_percent(root.counted, root.cap or 100),
-                                                size=16,
-                                                color=ft.Colors.GREY_700,
-                                            ),
-                                        ],
-                                        spacing=8,
-                                    ),
-                                ],
-                                tight=True,
+                            ft.Container(
+                                ft.Column(
+                                    [
+                                        ft.Text("素质能力得分", size=14),
+                                        ft.Row(
+                                            [
+                                                ft.Text(
+                                                    f"{format_score(root.counted)} /"
+                                                    f" {format_points(root.cap or 100)}",
+                                                    size=30,
+                                                    weight=ft.FontWeight.BOLD,
+                                                ),
+                                                ft.Text(
+                                                    format_percent(
+                                                        root.counted,
+                                                        root.cap or 100,
+                                                    ),
+                                                    size=14,
+                                                    color=ft.Colors.GREY_700,
+                                                ),
+                                            ],
+                                            spacing=8,
+                                            run_spacing=2,
+                                            wrap=True,
+                                        ),
+                                    ],
+                                    tight=True,
+                                ),
+                                col={"xs": 12, "md": 7},
                             ),
-                            ft.Column(
-                                [
-                                    ft.Text("折算综合测评贡献（×10%）", size=14),
-                                    ft.Text(format_score(root.counted / 10), size=24),
-                                    ft.Text(
-                                        f"还可加 {format_score(root.remaining)} 分",
-                                        size=14,
-                                        color=ft.Colors.GREY_700,
-                                    ),
-                                ],
-                                tight=True,
+                            ft.Container(
+                                ft.Column(
+                                    [
+                                        ft.Text("折算综合测评贡献（×10%）", size=14),
+                                        ft.Text(format_score(root.counted / 10), size=22),
+                                        ft.Text(
+                                            f"还可加 {format_score(root.remaining)} 分",
+                                            size=13,
+                                            color=ft.Colors.GREY_700,
+                                        ),
+                                    ],
+                                    tight=True,
+                                ),
+                                col={"xs": 12, "md": 5},
                             ),
                         ],
-                        alignment=ft.MainAxisAlignment.SPACE_EVENLY,
+                        spacing=12,
+                        run_spacing=12,
                     ),
                     padding=16,
                 )
