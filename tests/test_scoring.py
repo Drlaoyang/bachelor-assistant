@@ -50,7 +50,29 @@ def test_physical_base_participation_and_fitness(scorer, make_activity):
     assert result.find("physical_base").overflow == D("3")
 
 
-def test_physical_achievement_takes_highest(scorer, make_activity):
+def test_physical_achievement_accumulates(scorer, make_activity):
+    result = score(
+        scorer,
+        [
+            make_activity(
+                "physical_achievement_sports",
+                region="school",
+                track="individual",
+                result_type="rank",
+                result="first",
+            ),
+            make_activity(
+                "physical_achievement_sports",
+                region="school",
+                track="collective",
+                result_type="rank",
+                result="first",
+            ),
+        ],
+    )
+    assert counted(result, "physical_achievement") == D("5.25")
+    assert counted(result, "physical") == D("5.25")
+
     result = score(
         scorer,
         [
@@ -71,11 +93,7 @@ def test_physical_achievement_takes_highest(scorer, make_activity):
         ],
     )
     assert counted(result, "physical_achievement") == D("6")
-    assert counted(result, "physical") == D("6")
-    node = result.find("physical_achievement")
-    assert node is not None
-    assert [item.counted for item in node.activity_scores].count(D("6")) == 1
-    assert [item.counted for item in node.activity_scores].count(D("0")) == 1
+    assert result.find("physical_achievement").overflow == D("5.25")
 
 
 def test_arts_base_and_highest(scorer, make_activity):
@@ -447,7 +465,7 @@ def test_status_filtering_and_marginal_gain(scorer, make_activity):
         result_type="rank",
         result="first",
     )
-    assert scorer.marginal_gain(worse, current) == D("0")
+    assert scorer.marginal_gain(worse, current) == D("1.5")
 
 
 def test_manual_override(scorer, make_activity):
@@ -504,3 +522,26 @@ def test_extra_base_rule_counts_both_sections(scorer):
     assert counted(result, "physical_base") == D("3")
     assert counted(result, "physical_achievement") == D("6")
     assert counted(result, "physical") == D("9")
+
+
+def test_arts_achievement_accumulates(scorer, make_activity):
+    result = score(
+        scorer,
+        [
+            make_activity(
+                "arts_achievement_awards",
+                region="school",
+                track="individual",
+                result_type="rank",
+                result="first",
+            ),
+            make_activity(
+                "arts_achievement_literature",
+                platform="school",
+                article_index=1,
+                is_staff=False,
+            ),
+        ],
+    )
+    assert counted(result, "arts_achievement") == D("5")
+    assert counted(result, "arts") == D("5")

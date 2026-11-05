@@ -84,9 +84,9 @@ nodes:
     name: 成果性评价
     level: section
     cap: 6
-    aggregation: highest
+    aggregation: sum
     sort: 12
-    source_ref: "细则 P16-17 一（二）成果性评价（上限 6 分，不累计）"
+    source_ref: "细则 P16-17 一（二）上限 6 分；用户确认按累加执行（原文写不累计）"
 
   - id: physical_achievement_sports
     parent: physical_achievement
@@ -180,9 +180,9 @@ nodes:
     name: 成果性评价
     level: section
     cap: 6
-    aggregation: highest
+    aggregation: sum
     sort: 22
-    source_ref: "细则 P17 二（二）成果性评价（上限 6 分，不累计）"
+    source_ref: "细则 P17 二（二）上限 6 分；用户确认按累加执行（原文写不累计）"
 
   - id: arts_achievement_awards
     parent: arts_achievement
