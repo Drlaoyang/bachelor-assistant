@@ -7,7 +7,7 @@ from core.rules import RuleSet
 from core.scoring import Scorer
 from db.database import connect
 from db.repository import Repository
-from db.seed_rules import seed_rules_if_empty
+from db.seed_rules import sync_rules
 from device.paths import data_paths
 
 DEFAULT_YEAR = "2026-2027"
@@ -31,7 +31,7 @@ class AppState:
     def __init__(self):
         self.paths = data_paths()
         self.conn = connect(self.paths["db"])
-        seed_rules_if_empty(self.conn, self._rules_path())
+        sync_rules(self.conn, self._rules_path())
         self.repo = Repository(self.conn)
         self.rules: RuleSet = self.repo.load_active_ruleset()
         self.academic_year = self.repo.get_setting("academic_year", DEFAULT_YEAR) or DEFAULT_YEAR

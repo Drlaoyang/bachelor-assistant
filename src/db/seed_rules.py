@@ -2,19 +2,13 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import UTC
+from datetime import UTC, datetime
 from pathlib import Path
 
 from core.points import points_to_1e4
 
 
-def seed_rules_if_empty(conn: sqlite3.Connection, rules_path: Path | str) -> bool:
-    existing = conn.execute("SELECT COUNT(*) FROM rule_versions").fetchone()[0]
-    if existing:
-        return False
-    data = json.loads(Path(rules_path).read_text(encoding="utf-8"))
-    from datetime import datetime
-
+def _insert_rule_version(conn: sqlite3.Connection, data: dict) -> int:
     now = datetime.now(UTC).isoformat()
     sources = json.dumps(data.get("sources", []), ensure_ascii=False)
     cur = conn.execute(
@@ -56,5 +50,33 @@ def seed_rules_if_empty(conn: sqlite3.Connection, rules_path: Path | str) -> boo
         " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         rows,
     )
+    return version_id
+
+
+def seed_rules_if_empty(conn: sqlite3.Connection, rules_path: Path | str) -> bool:
+    existing = conn.execute("SELECT COUNT(*) FROM rule_versions").fetchone()[0]
+    if existing:
+        return False
+    data = json.loads(Path(rules_path).read_text(encoding="utf-8"))
+    _insert_rule_version(conn, data)
+    conn.commit()
+    return True
+
+
+def sync_rules(conn: sqlite3.Connection, rules_path: Path | str) -> bool:
+    data = json.loads(Path(rules_path).read_text(encoding="utf-8"))
+    active = conn.execute(
+        "SELECT id, raw_json FROM rule_versions WHERE is_active = 1"
+        " ORDER BY id DESC LIMIT 1"
+    ).fetchone()
+    if active is not None:
+        try:
+            if json.loads(active["raw_json"]) == data:
+                return False
+        except (TypeError, json.JSONDecodeError):
+            pass
+
+    conn.execute("UPDATE rule_versions SET is_active = 0")
+    _insert_rule_version(conn, data)
     conn.commit()
     return True

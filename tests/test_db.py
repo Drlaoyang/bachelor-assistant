@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -7,7 +8,7 @@ import pytest
 from db.backup import export_backup, import_backup
 from db.database import connect
 from db.repository import Repository
-from db.seed_rules import seed_rules_if_empty
+from db.seed_rules import seed_rules_if_empty, sync_rules
 
 ROOT = Path(__file__).resolve().parents[1]
 RULES_JSON = ROOT / "rules" / "2026-2027.json"
@@ -147,3 +148,25 @@ def test_extra_rule_node_persistence(repo):
     assert row["extra_rule_node_id"] == "physical_base_sports_rule"
     core = repository.to_core_activity(row)
     assert core.extra_rule_node_id == "physical_base_sports_rule"
+
+
+def test_sync_rules_updates_changed_rules(repo, tmp_path):
+    repository, _ = repo
+    assert sync_rules(repository.conn, RULES_JSON) is False
+
+    data = json.loads(RULES_JSON.read_text(encoding="utf-8"))
+    for node in data["nodes"]:
+        if node["id"] == "physical_achievement":
+            node["aggregation"] = "highest"
+    modified = tmp_path / "modified.json"
+    modified.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+
+    assert sync_rules(repository.conn, modified) is True
+    active = repository.active_rule_version()
+    stored = json.loads(active["raw_json"])
+    stored_node = next(
+        node for node in stored["nodes"] if node["id"] == "physical_achievement"
+    )
+    assert stored_node["aggregation"] == "highest"
+    assert len(repository.list_rule_versions()) == 2
+    assert sync_rules(repository.conn, modified) is False
