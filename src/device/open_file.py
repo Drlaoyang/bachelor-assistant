@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import mimetypes
 import os
 import subprocess
 import sys
@@ -28,10 +29,11 @@ async def share_file(
 
     share = ft.Share()
     name = display_name or path.name
-    if path.suffix.lower() == ".pdf":
+    mime_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    if mime_type == "application/pdf" or mime_type.startswith("image/"):
         file = ft.ShareFile.from_bytes(
             path.read_bytes(),
-            mime_type="application/pdf",
+            mime_type=mime_type,
             name=name,
         )
     else:

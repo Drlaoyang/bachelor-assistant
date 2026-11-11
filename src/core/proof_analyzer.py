@@ -4,6 +4,7 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 
+from core.image_tools import detect_evidence_type, prepare_image_for_ocr
 from core.rules import RuleSet
 
 MAX_OCR_PAGES = 5
@@ -292,12 +293,16 @@ DATE_MD_RE = re.compile(r"(\d{1,2})\s*月\s*(\d{1,2})\s*日")
 TITLE_STRIP_RE = re.compile(r"(获奖|荣誉|参赛|活动|实践)?(证书|证明书|证明)$")
 
 
-def extract_pdf_text(pdf_bytes: bytes) -> str:
+def extract_pdf_text(pdf_bytes: bytes, page_indexes: list[int] | None = None) -> str:
     import pymupdf
 
     doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
     try:
-        return "\n".join(page.get_text("text") for page in doc)
+        if page_indexes is None:
+            pages = list(doc)
+        else:
+            pages = [doc[index] for index in page_indexes if 0 <= index < len(doc)]
+        return "\n".join(page.get_text("text") for page in pages)
     finally:
         doc.close()
 
@@ -408,6 +413,19 @@ def _ocr_page(page, dpi: int, *, fast_only: bool = False) -> str:
             best_text = candidate
             best_score = score
     return best_text
+
+
+def ocr_image_text(png_bytes: bytes) -> str:
+    """OCR one already-upright image. Direction is corrected manually by the user."""
+    fast_engine = _get_ocr_engine(1024)
+    text = _ocr_png(fast_engine, png_bytes, use_cls=False)
+    if not _needs_quality(text):
+        return text
+    quality_engine = _get_ocr_engine(1600)
+    candidate = _ocr_png(quality_engine, png_bytes, use_cls=True)
+    if _text_score(candidate) >= _text_score(text):
+        return candidate
+    return text
 
 
 def ocr_pdf_text(
@@ -638,35 +656,122 @@ def suggest_from_text(
     )
 
 
+def _first_last_indexes(count: int) -> list[int]:
+    if count <= 1:
+        return [0] if count == 1 else []
+    return [0, count - 1]
+
+
+def _ocr_pdf_first_last(pdf_bytes: bytes, count: int) -> str:
+    texts: list[str] = []
+    try:
+        first_text = ocr_pdf_text(pdf_bytes, max_pages=1)
+    except Exception:
+        first_text = ""
+    if first_text.strip():
+        texts.append(first_text)
+    if count > 1:
+        try:
+            last_text = ocr_last_page_text(pdf_bytes)
+        except Exception:
+            last_text = ""
+        if last_text.strip():
+            texts.append(last_text)
+    return "\n".join(texts)
+
+
 def analyze_pdf(
     pdf_bytes: bytes,
     rules: RuleSet,
     academic_year: str | None = None,
 ) -> ProofSuggestion:
     try:
-        text = extract_pdf_text(pdf_bytes)
+        count = _pdf_page_count(pdf_bytes)
+        indexes = _first_last_indexes(count)
+        text = extract_pdf_text(pdf_bytes, indexes)
     except Exception as exc:
         return ProofSuggestion(notes=[f"无法解析 PDF：{exc}"])
 
     used_ocr = False
     if len(text.strip()) < 10:
         try:
-            text = ocr_pdf_text(pdf_bytes)
+            text = _ocr_pdf_first_last(pdf_bytes, count)
             used_ocr = bool(text.strip())
         except Exception as exc:
             return ProofSuggestion(notes=[f"PDF 无文字，OCR 失败：{exc}"])
-
-    if used_ocr and _extract_date(text, academic_year) is None:
-        try:
-            count = _pdf_page_count(pdf_bytes)
-            if count > 1:
-                last_text = ocr_last_page_text(pdf_bytes)
-                if last_text.strip():
-                    text = f"{text}\n{last_text}"
-        except Exception:
-            pass
+        if not used_ocr:
+            return ProofSuggestion(notes=["PDF 无文字，OCR 未识别到内容，请手动填写"])
 
     suggestion = suggest_from_text(text, rules, academic_year)
+
+    # 文字层可能只有标题，日期常常在最后一页。只在缺少日期时补 OCR 最后一页。
+    if not used_ocr and count > 1 and suggestion.activity_date is None:
+        try:
+            last_text = ocr_last_page_text(pdf_bytes)
+        except Exception:
+            last_text = ""
+        if last_text.strip():
+            used_ocr = True
+            text = f"{text}\n{last_text}"
+            suggestion = suggest_from_text(text, rules, academic_year)
+
     if used_ocr:
-        suggestion.notes.append("已使用本地 OCR 识别扫描件首页，请核对识别结果")
+        suggestion.notes.append("已使用本地 OCR 识别证明首尾页，请核对识别结果")
     return suggestion
+
+
+def analyze_image(
+    image_bytes: bytes,
+    rules: RuleSet,
+    academic_year: str | None = None,
+    rotation: int = 0,
+) -> ProofSuggestion:
+    try:
+        png = prepare_image_for_ocr(image_bytes, rotation=rotation)
+        text = ocr_image_text(png)
+    except Exception as exc:
+        return ProofSuggestion(notes=[f"无法识别图片：{exc}"])
+
+    suggestion = suggest_from_text(text, rules, academic_year)
+    if text.strip():
+        suggestion.notes.append("已使用本地 OCR 识别图片，请核对识别结果")
+    return suggestion
+
+
+def merge_suggestions(
+    primary: ProofSuggestion | None,
+    secondary: ProofSuggestion | None,
+) -> ProofSuggestion:
+    if primary is None:
+        return secondary or ProofSuggestion()
+    if secondary is None:
+        return primary
+    notes = list(primary.notes)
+    for note in secondary.notes:
+        if note not in notes:
+            notes.append(note)
+    return ProofSuggestion(
+        title=primary.title or secondary.title,
+        rule_id=primary.rule_id or secondary.rule_id,
+        activity_date=primary.activity_date or secondary.activity_date,
+        text="\n".join(part for part in (primary.text, secondary.text) if part),
+        confidence=max(primary.confidence, secondary.confidence),
+        notes=notes,
+    )
+
+
+def analyze_proof(
+    data: bytes,
+    filename: str | None,
+    rules: RuleSet,
+    academic_year: str | None = None,
+    rotation: int = 0,
+) -> ProofSuggestion:
+    """Analyze one PDF or image proof file."""
+    try:
+        evidence_type = detect_evidence_type(data, filename)
+    except ValueError as exc:
+        return ProofSuggestion(notes=[str(exc)])
+    if evidence_type.kind == "pdf":
+        return analyze_pdf(data, rules, academic_year)
+    return analyze_image(data, rules, academic_year, rotation=rotation)

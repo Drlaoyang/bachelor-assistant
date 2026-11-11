@@ -2,7 +2,13 @@ from __future__ import annotations
 
 import pymupdf
 
-from core.proof_analyzer import analyze_pdf, suggest_from_text
+from core.proof_analyzer import (
+    analyze_image,
+    analyze_pdf,
+    analyze_proof,
+    merge_suggestions,
+    suggest_from_text,
+)
 from device.pdf_tools import export_jpgs, pdf_page_count, pdf_to_jpgs, safe_stem
 
 
@@ -230,3 +236,89 @@ def test_last_page_ocr_provides_date(rules):
     suggestion = analyze_pdf(data, rules, "2026-2027")
     assert suggestion.rule_id == "physical_base_sports_rule"
     assert suggestion.activity_date == "2026-10-18"
+
+
+def _make_proof_image(text: str, *, rotate: int = 0) -> bytes:
+    from io import BytesIO
+
+    from PIL import Image
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=900, height=400)
+    page.insert_text((60, 180), text, fontname="china-s", fontsize=34)
+    png = page.get_pixmap(dpi=200, colorspace=pymupdf.csRGB, alpha=False).tobytes("png")
+    doc.close()
+    if not rotate:
+        return png
+
+    image = Image.open(BytesIO(png)).rotate(rotate, expand=True)
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def test_analyze_image_uses_ocr(rules):
+    data = _make_proof_image("全国大学生数学建模竞赛 2025年9月")
+    suggestion = analyze_image(data, rules)
+    assert suggestion.rule_id == "innovation_base_competition_rule"
+    assert suggestion.activity_date == "2025-09-01"
+    assert "数学建模" in suggestion.text
+    assert any("OCR" in note for note in suggestion.notes)
+
+
+def test_analyze_image_with_manual_rotation(rules):
+    data = _make_proof_image("全国大学生数学建模竞赛 2025年9月", rotate=90)
+    suggestion = analyze_image(data, rules, rotation=90)
+    assert suggestion.rule_id == "innovation_base_competition_rule"
+    assert suggestion.activity_date == "2025-09-01"
+
+
+def test_analyze_pdf_reads_only_first_and_last_page_text(rules):
+    doc = pymupdf.open()
+    first = doc.new_page()
+    first.insert_text((72, 72), "全国大学生数学建模竞赛", fontname="china-s", fontsize=18)
+    middle = doc.new_page()
+    middle.insert_text((72, 72), "张三 学号 20220001", fontname="china-s", fontsize=18)
+    last = doc.new_page()
+    last.insert_text((72, 72), "2025年9月", fontname="china-s", fontsize=18)
+    data = doc.tobytes()
+    doc.close()
+
+    suggestion = analyze_pdf(data, rules)
+    assert suggestion.rule_id == "innovation_base_competition_rule"
+    assert suggestion.activity_date == "2025-09-01"
+    assert "学号" not in suggestion.text
+
+
+def test_analyze_proof_dispatch(rules):
+    pdf = _make_pdf("全国大学生数学建模竞赛 2025年9月")
+    assert analyze_proof(pdf, "proof.pdf", rules).rule_id == (
+        "innovation_base_competition_rule"
+    )
+
+    image = _make_proof_image("全国大学生数学建模竞赛 2025年9月")
+    assert analyze_proof(image, "proof.png", rules).rule_id == (
+        "innovation_base_competition_rule"
+    )
+
+
+def test_merge_suggestions_fills_missing_fields():
+    from core.proof_analyzer import ProofSuggestion
+
+    merged = merge_suggestions(
+        ProofSuggestion(title="证书", rule_id="a", text="第一页", confidence=0.6),
+        ProofSuggestion(activity_date="2025-09-01", text="最后一页", confidence=0.9),
+    )
+    assert merged.title == "证书"
+    assert merged.rule_id == "a"
+    assert merged.activity_date == "2025-09-01"
+    assert "第一页" in merged.text and "最后一页" in merged.text
+    assert merged.confidence == 0.9
+
+
+def test_merge_suggestions_handles_empty():
+    from core.proof_analyzer import ProofSuggestion
+
+    assert merge_suggestions(None, None).title is None
+    assert merge_suggestions(ProofSuggestion(title="x"), None).title == "x"
+    assert merge_suggestions(None, ProofSuggestion(title="y")).title == "y"

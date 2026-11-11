@@ -191,3 +191,26 @@ def test_import_rejects_unknown_columns(repo, tmp_path):
             data_dir / "backups",
         )
     assert repository.get_setting("student_id") == "20220001"
+
+
+def test_evidence_mime_is_preserved(repo):
+    repository, _ = repo
+    activity_uuid = repository.create_activity(
+        rule_node_id="physical_base_sports_rule",
+        title="图片证明",
+        status="confirmed",
+        inputs={},
+        academic_year="2026-2027",
+    )
+    repository.add_evidence(
+        activity_uuid=activity_uuid,
+        sha256="b" * 64,
+        original_name="证明.png",
+        size=123,
+        relative_path="b.jpg",
+        mime="image/jpeg",
+    )
+    rows = repository.list_evidence(activity_uuid)
+    assert len(rows) == 1
+    assert rows[0]["mime"] == "image/jpeg"
+    assert rows[0]["relative_path"] == "b.jpg"

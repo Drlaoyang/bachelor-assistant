@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from datetime import date
+from io import BytesIO
+
 import flet as ft
 import pytest
+from PIL import Image
 
 from app.app import LedgerApp
+from app.staged_evidence import StagedEvidence
 from app.state import AppState
 from core.points import D
 from core.proof_analyzer import ProofSuggestion
@@ -312,3 +317,96 @@ def test_extra_base_checkbox_adds_both_sections(app):
     result = state.compute()
     assert result.find("physical_base").counted == D("3")
     assert result.find("physical_achievement").counted == D("6")
+
+
+def test_apply_suggestion_defaults_date_to_today(app):
+    ledger, state, fake = app
+    state.repo.set_setting("onboarded", "1")
+    ledger.open_activity_form(None)
+    form = ledger._activity_form
+    assert form is not None
+    form._apply_suggestion(ProofSuggestion(), 1)
+    assert form.date_field.value == date.today().isoformat()
+
+
+def test_attach_staged_image_converts_to_jpeg(app):
+    ledger, state, fake = app
+    state.repo.set_setting("onboarded", "1")
+    activity_uuid = state.repo.create_activity(
+        rule_node_id="physical_base_sports_rule",
+        title="图片证明",
+        status="confirmed",
+        inputs={},
+        academic_year=state.academic_year,
+    )
+    image = Image.new("RGB", (160, 90), "white")
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+
+    form = ledger._activity_form
+    assert form is None
+    ledger.open_activity_form(activity_uuid)
+    form = ledger._activity_form
+    assert form is not None
+    form.staged_files = [
+        StagedEvidence(
+            name="证明.png",
+            data=buffer.getvalue(),
+            mime="image/png",
+            suffix=".png",
+            rotation=90,
+        )
+    ]
+    form._attach_staged(activity_uuid)
+
+    rows = state.repo.list_evidence(activity_uuid)
+    assert len(rows) == 1
+    assert rows[0]["mime"] == "image/jpeg"
+    stored = state.paths["evidence"] / rows[0]["relative_path"]
+    assert stored.read_bytes().startswith(b"\xff\xd8")
+    with Image.open(stored) as saved:
+        assert saved.size == (90, 160)
+
+
+def test_recognized_date_replaces_default_today(app):
+    ledger, state, fake = app
+    state.repo.set_setting("onboarded", "1")
+    ledger.open_activity_form(None)
+    form = ledger._activity_form
+    assert form is not None
+    form._apply_suggestion(ProofSuggestion(), 1)
+    assert form.date_field.value == date.today().isoformat()
+    form._apply_suggestion(ProofSuggestion(activity_date="2025-09-01"), 1)
+    assert form.date_field.value == "2025-09-01"
+
+
+def test_evidence_page_renders_image_preview(app):
+    ledger, state, fake = app
+    state.repo.set_setting("onboarded", "1")
+    activity_uuid = state.repo.create_activity(
+        rule_node_id="physical_base_sports_rule",
+        title="图片证明",
+        status="confirmed",
+        inputs={},
+        academic_year=state.academic_year,
+    )
+    image = Image.new("RGB", (160, 90), "white")
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    data = buffer.getvalue()
+    from core.image_tools import prepare_image_for_storage
+    from device.files import save_evidence_blob
+
+    stored, mime, suffix = prepare_image_for_storage(data)
+    digest, relative = save_evidence_blob(state.paths["evidence"], stored, suffix)
+    state.repo.add_evidence(
+        activity_uuid=activity_uuid,
+        sha256=digest,
+        original_name="证明.png",
+        size=len(stored),
+        relative_path=relative,
+        mime=mime,
+    )
+
+    ledger.show_page(2)
+    assert fake.controls

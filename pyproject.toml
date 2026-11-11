@@ -1,10 +1,13 @@
 [project]
 name = "sdu-ce-ledger"
-version = "0.1.1"
+version = "0.1.2"
 description = "山东大学网络空间安全学院本科生综合测评加分账本"
 requires-python = ">=3.12"
 dependencies = [
     "flet==1.0.4",
+    "flet-camera==1.0.4",
+    "flet-permission-handler==1.0.4",
+    "Pillow>=12",
     "platformdirs>=4",
     "pymupdf==1.27.2.3",
     "rapidocr==3.10.0",
@@ -25,6 +28,7 @@ module = "main"
 [tool.flet]
 product = "综合测评账本"
 org = "com.sdu.celedger"
+permissions = ["camera"]
 
 [tool.flet.android]
 extract_packages = ["rapidocr"]

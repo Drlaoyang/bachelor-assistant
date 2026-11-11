@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-VERSION="0.1.1"
+VERSION="0.1.2"
 APK_NAME="sdu-ce-ledger-${VERSION}-arm64.apk"
 
 if [ ! -x .venv/bin/flet ]; then

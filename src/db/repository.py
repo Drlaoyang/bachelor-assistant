@@ -245,6 +245,7 @@ class Repository:
         original_name: str,
         size: int,
         relative_path: str,
+        mime: str = "application/pdf",
     ) -> str:
         new_uuid = str(uuidlib.uuid4())
         self.conn.execute(
@@ -255,7 +256,7 @@ class Repository:
                 activity_uuid,
                 sha256,
                 original_name,
-                "application/pdf",
+                mime,
                 size,
                 relative_path,
                 _now(),

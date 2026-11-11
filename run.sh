@@ -6,10 +6,13 @@ if [ ! -x .venv/bin/python ]; then
     python3 -m venv .venv
 fi
 
-if ! .venv/bin/python -c "import flet" >/dev/null 2>&1; then
+if ! .venv/bin/python -c "import flet, flet_camera, flet_permission_handler" >/dev/null 2>&1; then
     .venv/bin/python -m pip install --upgrade pip
     .venv/bin/pip install \
         "flet==1.0.4" \
+        "flet-camera==1.0.4" \
+        "flet-permission-handler==1.0.4" \
+        "Pillow>=12" \
         "platformdirs>=4" \
         "pymupdf==1.27.2.3" \
         "rapidocr==3.10.0" \

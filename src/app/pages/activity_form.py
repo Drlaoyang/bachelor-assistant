@@ -1,18 +1,25 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import flet as ft
 
+from app.components.camera_capture import (
+    camera_supported,
+    capture_photo,
+    choose_image_rotation,
+)
 from app.components.form_fields import DynamicForm
 from app.components.rule_picker import RulePicker
 from app.score_text import describe_gain
+from app.staged_evidence import StagedEvidence
 from core.calculators import calculate
+from core.image_tools import detect_evidence_type, prepare_image_for_storage
 from core.models import Activity as CoreActivity
 from core.points import format_points, to_decimal
-from core.proof_analyzer import ProofSuggestion, analyze_pdf
+from core.proof_analyzer import ProofSuggestion, analyze_proof, merge_suggestions
 from core.scoring import Scorer
 from device.files import save_evidence_blob
 from device.paths import data_paths
@@ -22,6 +29,9 @@ EXTRA_BASE_RULES = {
     "arts_achievement_awards": "arts_base_activities_rule",
 }
 
+IMAGE_MAX_SIDE = 2400
+JPEG_QUALITY = 92
+
 
 class ActivityForm:
     def __init__(self, page: ft.Page, state, app, activity_uuid: str | None):
@@ -29,9 +39,11 @@ class ActivityForm:
         self.state = state
         self.app = app
         self.activity_uuid = activity_uuid
-        self.staged_files: list[tuple[str, bytes]] = []
+        self.staged_files: list[StagedEvidence] = []
         self.file_picker = ft.FilePicker()
         self._picker_attached = False
+        self.permission_handler = None
+        self._analysis_seq = 0
         self.form = DynamicForm(on_change=lambda _: self.preview())
         self.rule_picker = RulePicker(self.state.rules, self._on_rule_selected)
         self.extra_base_check = ft.Checkbox(
@@ -41,8 +53,9 @@ class ActivityForm:
             on_change=lambda _: self.preview(),
         )
         self.title_field = ft.TextField(label="标题", on_change=lambda _: self.preview())
+        self._date_is_default = False
         self.date_field = ft.TextField(
-            label="日期", hint_text="YYYY-MM-DD", on_change=lambda _: self.preview()
+            label="日期", hint_text="YYYY-MM-DD", on_change=self._on_date_change
         )
         self.notes_field = ft.TextField(label="备注", multiline=True, min_lines=1, max_lines=3)
         self.override_check = ft.Checkbox(label="手动调整分值", on_change=self._on_override_toggle)
@@ -51,6 +64,19 @@ class ActivityForm:
         )
         self.override_reason = ft.TextField(label="调整理由", visible=False)
         self.preview_text = ft.Text("选择规则后实时显示计分预览。", size=13)
+        self.ocr_status = ft.Text("", size=12, color=ft.Colors.GREY_700)
+        self.reanalyze_button = ft.TextButton(
+            "重新识别",
+            icon=ft.Icons.REFRESH,
+            visible=False,
+            on_click=self._reanalyze_staged,
+        )
+        self.ocr_text = ft.Text("", size=12, selectable=True)
+        self.ocr_panel = ft.ExpansionTile(
+            title=ft.Text("识别原文", size=13),
+            controls=[self.ocr_text],
+            visible=False,
+        )
         self.evidence_column = ft.Column([], spacing=6)
         self.existing_evidence: list = []
         if activity_uuid:
@@ -71,6 +97,7 @@ class ActivityForm:
         self.form.set_values(json.loads(row["inputs_json"] or "{}"))
         self.title_field.value = row["title"]
         self.date_field.value = row["activity_date"]
+        self._date_is_default = False
         self.notes_field.value = row["notes"]
         if row["override_points_1e4"] is not None:
             self.override_check.value = True
@@ -97,6 +124,10 @@ class ActivityForm:
             self.form.controls = []
         self.preview()
         self.page.update()
+
+    def _on_date_change(self, _):
+        self._date_is_default = False
+        self.preview()
 
     def _on_override_toggle(self, _):
         self.override_points.visible = bool(self.override_check.value)
@@ -164,12 +195,27 @@ class ActivityForm:
         self.page.update()
 
     # ------------------------------------------------------------------
+    def _permission_handler(self):
+        if self.permission_handler is None:
+            try:
+                import flet_permission_handler as fph
+            except ImportError:
+                return None
+            self.permission_handler = fph.PermissionHandler()
+            services = getattr(self.page, "services", None)
+            if services is not None:
+                try:
+                    services.append(self.permission_handler)
+                except Exception:
+                    pass
+        return self.permission_handler
+
     async def pick_evidence(self, _):
         try:
             files = await self.file_picker.pick_files(
-                allow_multiple=True,
+                allow_multiple=False,
                 file_type=ft.FilePickerFileType.CUSTOM,
-                allowed_extensions=["pdf"],
+                allowed_extensions=["pdf", "jpg", "jpeg", "png", "webp"],
                 with_data=True,
             )
         except Exception as exc:
@@ -177,42 +223,144 @@ class ActivityForm:
             return
         if not files:
             return
-        for f in files:
-            data = f.bytes
-            if data is None and f.path:
-                data = Path(f.path).read_bytes()
-            if data is not None:
-                self.staged_files.append((f.name, data))
-        self._render_staged()
-        self.page.update()
-        if self.staged_files:
-            self.app.notify(f"已选择 {len(self.staged_files)} 个 PDF，正在识别…")
-            first_data = self.staged_files[0][1]
+        f = files[0]
+        data = f.bytes
+        if data is None and f.path:
+            data = Path(f.path).read_bytes()
+        if data is None:
+            self.app.notify("无法读取所选文件内容")
+            return
+
+        try:
+            evidence_type = detect_evidence_type(data, f.name)
+        except ValueError as exc:
+            self.app.notify(str(exc))
+            return
+
+        rotation = 0
+        if evidence_type.kind == "image":
             try:
-                suggestion = await asyncio.to_thread(
-                    analyze_pdf,
-                    first_data,
-                    self.state.rules,
-                    self.state.academic_year,
+                chosen = await choose_image_rotation(
+                    self.page, data, f.name, self.app.notify
                 )
             except Exception as exc:
-                self.app.notify(f"已选择 {len(self.staged_files)} 个 PDF；分析失败：{exc}")
-            else:
-                self._apply_suggestion(suggestion, len(self.staged_files))
+                self.app.notify(f"无法打开图片校正：{exc}")
+                return
+            if chosen is None:
+                return
+            rotation = chosen
+
+        self.staged_files.append(
+            StagedEvidence(
+                name=f.name,
+                data=data,
+                mime=evidence_type.mime,
+                suffix=evidence_type.suffix,
+                rotation=rotation,
+            )
+        )
+        self._render_staged()
         self.page.update()
+        await self._analyze_staged()
+
+    async def capture_evidence(self, _):
+        try:
+            photo = await capture_photo(
+                self.page,
+                self._permission_handler(),
+                self.app.notify,
+            )
+        except Exception as exc:
+            self.app.notify(f"拍照失败：{exc}")
+            return
+        if photo is None:
+            return
+        data, rotation = photo
+        try:
+            evidence_type = detect_evidence_type(data, "photo.jpg")
+        except ValueError as exc:
+            self.app.notify(str(exc))
+            return
+        self.staged_files.append(
+            StagedEvidence(
+                name=f"photo_{datetime.now():%Y%m%d_%H%M%S}.jpg",
+                data=data,
+                mime=evidence_type.mime,
+                suffix=evidence_type.suffix,
+                rotation=rotation,
+            )
+        )
+        self._render_staged()
+        self.page.update()
+        await self._analyze_staged()
+
+    async def _reanalyze_staged(self, _):
+        await self._analyze_staged()
+
+    async def _analyze_staged(self) -> None:
+        self.reanalyze_button.visible = bool(self.staged_files)
+        if not self.staged_files:
+            self._ensure_default_date()
+            self.ocr_status.value = ""
+            self.ocr_panel.visible = False
+            self.ocr_text.value = ""
+            self.page.update()
+            return
+
+        self._analysis_seq += 1
+        seq = self._analysis_seq
+        self.ocr_status.value = "正在识别证明…"
+        self.page.update()
+
+        first = self.staged_files[0]
+        last = self.staged_files[-1]
+        items = [first] if len(self.staged_files) == 1 else [first, last]
+        try:
+            results = []
+            for item in items:
+                results.append(
+                    await asyncio.to_thread(
+                        analyze_proof,
+                        item.data,
+                        item.name,
+                        self.state.rules,
+                        self.state.academic_year,
+                        item.rotation,
+                    )
+                )
+        except Exception as exc:
+            if seq != self._analysis_seq:
+                return
+            self.ocr_status.value = f"识别失败：{exc}"
+            self._ensure_default_date()
+            self.page.update()
+            return
+
+        if seq != self._analysis_seq:
+            return
+
+        suggestion = merge_suggestions(
+            results[0] if results else None,
+            results[1] if len(results) > 1 else None,
+        )
+        self.ocr_status.value = ""
+        self.ocr_text.value = suggestion.text
+        self.ocr_panel.visible = bool(suggestion.text.strip())
+        self._apply_suggestion(suggestion, len(self.staged_files))
+
+    def _ensure_default_date(self) -> None:
+        if not (self.date_field.value or "").strip():
+            self.date_field.value = date.today().isoformat()
+            self._date_is_default = True
 
     def _apply_suggestion(self, suggestion: ProofSuggestion, count: int) -> None:
         filled = []
         if suggestion.title and not (self.title_field.value or "").strip():
             self.title_field.value = suggestion.title
             filled.append(f"名称「{suggestion.title}」")
-        if suggestion.activity_date and not (self.date_field.value or "").strip():
-            self.date_field.value = suggestion.activity_date
-            filled.append(f"日期「{suggestion.activity_date}」")
         if suggestion.rule_id and not self.rule_picker.leaf_id:
             self.rule_picker.set_leaf(suggestion.rule_id)
             filled.append(f"类型「{self.state.rules.get(suggestion.rule_id).name}」")
-        self.preview()
 
         recognized = []
         if suggestion.title:
@@ -221,43 +369,120 @@ class ActivityForm:
             recognized.append(f"类型「{self.state.rules.get(suggestion.rule_id).name}」")
         if suggestion.activity_date:
             recognized.append(f"日期「{suggestion.activity_date}」")
+
+        current_date = (self.date_field.value or "").strip()
+        if suggestion.activity_date and (not current_date or self._date_is_default):
+            self.date_field.value = suggestion.activity_date
+            self._date_is_default = False
+            filled.append(f"日期「{suggestion.activity_date}」")
+        elif not current_date:
+            self.date_field.value = date.today().isoformat()
+            self._date_is_default = True
+
+        self.preview()
+
         if recognized:
             suffix = "已自动填入" if filled else "已有内容未覆盖"
             self.app.notify(
-                f"已选择 {count} 个 PDF；识别到 " + "、".join(recognized) + f"；{suffix}"
+                f"已选择 {count} 个证明文件；识别到 "
+                + "、".join(recognized)
+                + f"；{suffix}"
             )
         else:
             notes = "；".join(suggestion.notes) or "未识别到可自动填充的信息"
-            self.app.notify(f"已选择 {count} 个 PDF；{notes}")
+            self.app.notify(f"已选择 {count} 个证明文件；{notes}")
         self.page.update()
 
     def _render_staged(self):
-        self.evidence_column.controls = [
-            ft.Row(
-                [
-                    ft.Icon(ft.Icons.PICTURE_AS_PDF),
-                    ft.Text(name, expand=True),
-                    ft.IconButton(ft.Icons.CLOSE, on_click=lambda _, i=i: self._remove_staged(i)),
-                ]
-            )
-            for i, (name, _data) in enumerate(self.staged_files)
-        ]
+        controls = []
+        for i, item in enumerate(self.staged_files):
+            if item.is_image:
+                preview = ft.Image(
+                    src=item.preview(),
+                    width=56,
+                    height=56,
+                    fit=ft.BoxFit.COVER,
+                    border_radius=4,
+                )
 
-    def _remove_staged(self, index: int):
+                async def rotate_left_handler(_, i=i):
+                    await self._rotate_staged(i, -90)
+
+                async def rotate_right_handler(_, i=i):
+                    await self._rotate_staged(i, 90)
+
+                rotate_controls = [
+                    ft.IconButton(
+                        ft.Icons.ROTATE_LEFT,
+                        tooltip="向左旋转",
+                        on_click=rotate_left_handler,
+                    ),
+                    ft.IconButton(
+                        ft.Icons.ROTATE_RIGHT,
+                        tooltip="向右旋转",
+                        on_click=rotate_right_handler,
+                    ),
+                ]
+            else:
+                preview = ft.Icon(ft.Icons.PICTURE_AS_PDF, color=ft.Colors.RED)
+                rotate_controls = []
+
+            async def remove_handler(_, i=i):
+                await self._remove_staged(i)
+
+            controls.append(
+                ft.Row(
+                    [
+                        preview,
+                        ft.Text(item.name, expand=True),
+                        *rotate_controls,
+                        ft.IconButton(
+                            ft.Icons.CLOSE,
+                            tooltip="移除",
+                            on_click=remove_handler,
+                        ),
+                    ]
+                )
+            )
+        self.evidence_column.controls = controls
+
+    async def _rotate_staged(self, index: int, delta: int) -> None:
+        if index < 0 or index >= len(self.staged_files):
+            return
+        self.staged_files[index].rotate(delta)
+        self._render_staged()
+        self.page.update()
+        await self._analyze_staged()
+
+    async def _remove_staged(self, index: int):
+        if index < 0 or index >= len(self.staged_files):
+            return
         del self.staged_files[index]
         self._render_staged()
         self.page.update()
+        await self._analyze_staged()
 
     def _attach_staged(self, activity_uuid: str):
         paths = data_paths()
-        for name, data in self.staged_files:
-            digest, relative = save_evidence_blob(paths["evidence"], data, ".pdf")
+        for item in self.staged_files:
+            if item.is_image:
+                data, mime, suffix = prepare_image_for_storage(
+                    item.data,
+                    rotation=item.rotation,
+                    max_side=IMAGE_MAX_SIDE,
+                    quality=JPEG_QUALITY,
+                )
+            else:
+                data, mime, suffix = item.data, item.mime, item.suffix
+            name = f"{Path(item.name).stem}.jpg" if item.is_image else item.name
+            digest, relative = save_evidence_blob(paths["evidence"], data, suffix)
             self.state.repo.add_evidence(
                 activity_uuid=activity_uuid,
                 sha256=digest,
                 original_name=name,
                 size=len(data),
                 relative_path=relative,
+                mime=mime,
             )
         self.staged_files.clear()
 
@@ -270,10 +495,14 @@ class ActivityForm:
     def _render_existing_evidence(self):
         controls = []
         for row in self.existing_evidence:
+            is_image = str(row["mime"] or "").startswith("image/")
             controls.append(
                 ft.Row(
                     [
-                        ft.Icon(ft.Icons.PICTURE_AS_PDF),
+                        ft.Icon(
+                            ft.Icons.IMAGE if is_image else ft.Icons.PICTURE_AS_PDF,
+                            color=ft.Colors.BLUE if is_image else ft.Colors.RED,
+                        ),
                         ft.Text(row["original_name"], expand=True),
                         ft.IconButton(
                             ft.Icons.DELETE_OUTLINE,
@@ -301,7 +530,7 @@ class ActivityForm:
                 return
         else:
             self.form.clear_errors()
-        date_text = (self.date_field.value or "").strip()
+        date_text = (self.date_field.value or "").strip() or date.today().isoformat()
         self.date_field.error = None
         if date_text:
             try:
@@ -355,13 +584,30 @@ class ActivityForm:
         if services is not None and not self._picker_attached:
             services.append(self.file_picker)
             self._picker_attached = True
+        evidence_buttons = [
+            ft.OutlinedButton(
+                "添加文件", icon=ft.Icons.UPLOAD_FILE, on_click=self.pick_evidence
+            )
+        ]
+        if camera_supported(self.page):
+            evidence_buttons.append(
+                ft.OutlinedButton(
+                    "拍照", icon=ft.Icons.PHOTO_CAMERA, on_click=self.capture_evidence
+                )
+            )
         evidence_section = ft.Column(
             [
-                ft.Text("证明材料（PDF）", weight=ft.FontWeight.BOLD),
-                ft.OutlinedButton(
-                    "选择 PDF", icon=ft.Icons.UPLOAD_FILE, on_click=self.pick_evidence
+                ft.Text("证明材料（PDF / 图片）", weight=ft.FontWeight.BOLD),
+                ft.Text(
+                    "一个活动添加一个证明文件；PDF 只识别第 1 页和最后一页，"
+                    "图片可手动旋转校正。",
+                    size=12,
+                    color=ft.Colors.GREY_700,
                 ),
+                ft.Row(evidence_buttons, wrap=True, spacing=8),
                 self.evidence_column,
+                ft.Row([self.ocr_status, self.reanalyze_button], spacing=8),
+                self.ocr_panel,
                 *self._render_existing_evidence(),
             ],
             spacing=8,

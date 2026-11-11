@@ -4,6 +4,7 @@ import asyncio
 
 import flet as ft
 
+from core.image_tools import render_preview
 from device.open_file import open_file_desktop, open_or_share, share_files
 from device.paths import data_paths
 from device.pdf_tools import export_jpgs, pdf_page_count, safe_stem
@@ -81,12 +82,47 @@ def build_evidence(page: ft.Page, state, app) -> ft.Control:
             ]
             page.show_dialog(dialog)
 
+        mime = str(row["mime"] or "")
+        is_image = mime.startswith("image/")
+        if is_image:
+            try:
+                preview = ft.Image(
+                    src=render_preview(full_path.read_bytes(), max_side=96),
+                    width=56,
+                    height=56,
+                    fit=ft.BoxFit.COVER,
+                    border_radius=4,
+                )
+            except Exception:
+                preview = ft.Icon(ft.Icons.IMAGE, color=ft.Colors.BLUE)
+        else:
+            preview = ft.Icon(ft.Icons.PICTURE_AS_PDF, color=ft.Colors.RED)
+
+        actions = []
+        if not is_image:
+            actions.append(
+                ft.IconButton(
+                    ft.Icons.IMAGE,
+                    tooltip="转 JPG（默认第 1 页）",
+                    on_click=convert_handler,
+                )
+            )
+        actions.extend(
+            [
+                ft.IconButton(ft.Icons.OPEN_IN_NEW, on_click=open_handler),
+                ft.IconButton(
+                    ft.Icons.DELETE_OUTLINE,
+                    on_click=lambda _, u=row["uuid"]: _delete(page, state, app, u),
+                ),
+            ]
+        )
+
         controls.append(
             ft.Card(
                 ft.Container(
                     ft.Row(
                         [
-                            ft.Icon(ft.Icons.PICTURE_AS_PDF, color=ft.Colors.RED),
+                            preview,
                             ft.Column(
                                 [
                                     ft.Text(row["original_name"], weight=ft.FontWeight.BOLD),
@@ -101,18 +137,7 @@ def build_evidence(page: ft.Page, state, app) -> ft.Control:
                                 expand=True,
                                 spacing=2,
                             ),
-                            ft.IconButton(
-                                ft.Icons.IMAGE,
-                                tooltip="转 JPG（默认第 1 页）",
-                                on_click=convert_handler,
-                            ),
-                            ft.IconButton(ft.Icons.OPEN_IN_NEW, on_click=open_handler),
-                            ft.IconButton(
-                                ft.Icons.DELETE_OUTLINE,
-                                on_click=lambda _, u=row["uuid"]: _delete(
-                                    page, state, app, u
-                                ),
-                            ),
+                            *actions,
                         ]
                     ),
                     padding=12,
@@ -123,7 +148,7 @@ def build_evidence(page: ft.Page, state, app) -> ft.Control:
         [
             ft.Text("证明材料", size=24, weight=ft.FontWeight.BOLD),
             ft.Text(
-                "图片按钮转 JPG：默认只转第 1 页，多页 PDF 可选全部；转换后直接分享。",
+                "PDF 可转 JPG 后分享；图片证明可直接查看或分享。",
                 size=12,
                 color=ft.Colors.GREY_700,
             ),
